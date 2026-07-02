@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间戳换算工具</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,Microsoft YaHei}
+        body{background:#f7f9fc;color:#222}
+        header{background:#2563eb;color:#fff;padding:30px 20px;text-align:center}
+        h1{margin-bottom:10px;font-size:24px}
+        nav{background:#fff;padding:15px 20px;box-shadow:0 2px 6px #00000015}
+        nav a{text-decoration:none;color:#2563eb;margin:0 12px;font-size:16px}
+        nav a:hover{text-decoration:underline}
+        .container{max-width:650px;margin:40px auto;padding:0 20px}
+        .box{background:#fff;padding:25px;border-radius:12px;box-shadow:0 2px 12px #00000010;margin-bottom:20px}
+        label{display:block;margin-bottom:8px;font-weight:500}
+        input{width:100%;padding:12px 15px;border:1px solid #ddd;border-radius:6px;font-size:16px;outline:none}
+        input:focus{border-color:#2563eb}
+        .result{padding:14px;background:#eff6ff;border-radius:6px;margin-top:10px;word-break:break-all}
+        button{background:#2563eb;color:#fff;border:none;padding:9px 16px;border-radius:6px;margin-top:10px;cursor:pointer}
+        button:hover{background:#1d4ed8}
+        .tip{font-size:13px;color:#777;margin-top:5px}
+        footer{text-align:center;padding:30px;color:#777;font-size:14px;margin-top:60px}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>时间戳换算工具（北京时间 UTC+8）</h1>
+    </header>
+    <nav>
+        <a href="index.html">返回首页</a>
+        <a href="timestamp.html">时间戳工具</a>
+    </nav>
+    <div class="container">
+        <div class="box">
+            <label>输入时间戳（10位秒 / 13位毫秒）</label>
+            <input type="text" id="timestamp" placeholder="示例：1735689600">
+            <div class="result" id="timeResult">转换结果</div>
+            <button onclick="copyTime()">复制时间</button>
+        </div>
+
+        <div class="box">
+            <label>输入日期 yyyy-MM-dd HH:mm:ss</label>
+            <input type="text" id="datetime" placeholder="示例：2026-01-01 12:00:00">
+            <div class="result" id="tsResult">转换结果</div>
+            <button onclick="copyTs()">复制时间戳</button>
+            <div class="tip">支持 2026/01/01 格式自动兼容</div>
+        </div>
+    </div>
+    <footer>
+        © 2026 我的个人网站
+    </footer>
+
+    <script>
+        // 时间戳转日期
+        document.getElementById('timestamp').oninput = function(){
+            let val = this.value.trim();
+            let resDom = document.getElementById('timeResult');
+            if(!val){resDom.innerText='转换结果';return}
+            let ts = Number(val);
+            if(isNaN(ts)){resDom.innerText='❌ 非法数字';return}
+            if(val.length===10) ts *= 1000;
+            let d = new Date(ts);
+            if(isNaN(d.getTime())){resDom.innerText='❌ 无效时间戳';return}
+            resDom.innerText = formatDate(d)+' 北京时间';
+        }
+
+        // 日期转时间戳
+        document.getElementById('datetime').oninput = function(){
+            let val = this.value.trim();
+            let resDom = document.getElementById('tsResult');
+            if(!val){resDom.innerText='转换结果';return}
+            let d = new Date(val.replace(/-/g,'/'));
+            let ms = d.getTime();
+            if(isNaN(ms)){resDom.innerText='❌ 时间格式错误';return}
+            resDom.innerText = `毫秒时间戳：${ms}\n秒时间戳：${Math.floor(ms/1000)}`;
+        }
+
+        function formatDate(date){
+            let y=date.getFullYear();
+            let m=String(date.getMonth()+1).padStart(2,'0');
+            let d=String(date.getDate()).padStart(2,'0');
+            let h=String(date.getHours()).padStart(2,'0');
+            let mi=String(date.getMinutes()).padStart(2,'0');
+            let s=String(date.getSeconds()).padStart(2,'0');
+            return `${y}-${m}-${d} ${h}:${mi}:${s}`;
+        }
+
+        async function copyTime(){
+            let txt = document.getElementById('timeResult').innerText.replace(' 北京时间','');
+            if(txt.includes('❌')||txt==='转换结果')return;
+            await navigator.clipboard.writeText(txt);
+            alert('复制成功');
+        }
+        async function copyTs(){
+            let txt = document.getElementById('tsResult').innerText;
+            if(txt.includes('❌')||txt==='转换结果')return;
+            await navigator.clipboard.writeText(txt);
+            alert('复制成功');
+        }
+    </script>
+</body>
+</html>
