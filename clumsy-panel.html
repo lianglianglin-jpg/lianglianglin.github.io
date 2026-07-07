@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clumsy 弱网参数面板 | 延迟丢包全局模拟</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,"Microsoft YaHei",sans-serif}
+body{background:#f7f9fc;color:#222}
+header{background:#2563eb;color:#fff;padding:26px 20px;text-align:center}
+h1{font-size:24px;margin-bottom:8px}
+nav{background:#fff;padding:14px 20px;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+nav a{text-decoration:none;color:#2563eb;margin:0 11px;font-size:16px}
+nav a:hover{text-decoration:underline}
+.container{max-width:780px;margin:36px auto;padding:0 20px}
+.main-card{background:#fff;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,0.07);padding:28px}
+.func-item{display:flex;align-items:flex-start;margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid #eee}
+.func-item:last-child{border:none;margin-bottom:0}
+.check-box{margin-top:4px;width:18px;height:18px;cursor:pointer}
+.func-desc{flex:1;margin-left:12px}
+.func-title{font-weight:600;font-size:16px;margin-bottom:6px}
+.param-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.param-group{flex:1;min-width:180px}
+.param-group label{display:block;font-size:13px;color:#555;margin-bottom:4px}
+.param-group input[type="range"]{width:100%}
+.param-val{color:#2563eb;font-weight:bold;margin-left:6px}
+.preset-box{margin:24px 0;padding:16px;background:#f5f8ff;border-radius:8px}
+.preset-box h3{font-size:15px;margin-bottom:10px;color:#333}
+.preset-btns{display:flex;gap:9px;flex-wrap:wrap}
+.preset-btns button{border:1px solid #2563eb;background:#fff;color:#2563eb;padding:7px 13px;border-radius:6px;cursor:pointer}
+.preset-btns button:hover{background:#2563eb;color:#fff}
+.operate-box{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap}
+.operate-box button{padding:10px 18px;border:none;border-radius:6px;cursor:pointer;font-size:15px}
+.btn-gen{background:#2563eb;color:#fff}
+.btn-down{background:#10b981;color:#fff}
+textarea{width:100%;min-height:130px;margin-top:14px;padding:12px;border:1px solid #ddd;border-radius:6px;font-family:monospace}
+.tip-text{font-size:13px;color:#666;margin-top:10px;line-height:1.7}
+footer{text-align:center;padding:32px;color:#777;font-size:14px;margin-top:70px}
+</style>
+</head>
+<body>
+<header>
+    <h1>Clumsy 可视化参数配置面板</h1>
+    <p>生成配置文件，配合Clumsy实现系统级延迟/丢包/乱序/限速</p>
+</header>
+<nav>
+    <a href="index.html">首页</a>
+    <a href="timestamp.html">时间戳工具</a>
+    <a href="clumsy-panel.html">Clumsy弱网面板</a>
+</nav>
+<div class="container">
+    <div class="main-card">
+        <!-- 延迟Lag -->
+        <div class="func-item">
+            <input type="checkbox" class="check-box" id="lagEnable">
+            <div class="func-desc">
+                <div class="func-title">🔹 Lag 数据包延迟</div>
+                <div class="param-row">
+                    <div class="param-group">
+                        <label>出站延迟(ms)</label>
+                        <input type="range" id="lagOut" min="0" max="3000" value="500">
+                        <span class="param-val" id="lagOutVal">500ms</span>
+                    </div>
+                    <div class="param-group">
+                        <label>入站延迟(ms)</label>
+                        <input type="range" id="lagIn" min="0" max="3000" value="500">
+                        <span class="param-val" id="lagInVal">500ms</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 丢包Drop -->
+        <div class="func-item">
+            <input type="checkbox" class="check-box" id="dropEnable">
+            <div class="func-desc">
+                <div class="func-title">🔹 Drop 随机丢包</div>
+                <div class="param-row">
+                    <div class="param-group">
+                        <label>出站丢包概率 %</label>
+                        <input type="range" id="dropOut" min="0" max="100" value="10">
+                        <span class="param-val" id="dropOutVal">10%</span>
+                    </div>
+                    <div class="param-group">
+                        <label>入站丢包概率 %</label>
+                        <input type="range" id="dropIn" min="0" max="100" value="10">
+                        <span class="param-val" id="dropInVal">10%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 节流Throttle -->
+        <div class="func-item">
+            <input type="checkbox" class="check-box" id="throttleEnable">
+            <div class="func-desc">
+                <div class="func-title">🔹 Throttle 流量节流拥堵</div>
+                <div class="param-row">
+                    <div class="param-group">
+                        <label>时间帧(ms)</label>
+                        <input type="range" id="throttleTime" min="50" max="2000" value="500">
+                        <span class="param-val" id="throttleTimeVal">500ms</span>
+                    </div>
+                    <div class="param-group">
+                        <label>上下行开关</label>
+                        <div>
+                            <input type="checkbox" id="throttleOut">出站
+                            <input type="checkbox" id="throttleIn">入站
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 乱序Out of order -->
+        <div class="func-item">
+            <input type="checkbox" class="check-box" id="orderEnable">
+            <div class="func-desc">
+                <div class="func-title">🔹 Out of Order 数据包乱序</div>
+                <div class="param-row">
+                    <div class="param-group">
+                        <label>乱序概率 %</label>
+                        <input type="range" id="orderPct" min="0" max="100" value="20">
+                        <span class="param-val" id="orderPctVal">20%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 重复Duplicate -->
+        <div class="func-item">
+            <input type="checkbox" class="check-box" id="dupEnable">
+            <div class="func-desc">
+                <div class="func-title">🔹 Duplicate 数据包重复发送</div>
+                <div class="param-row">
+                    <div class="param-group">
+                        <label>重复份数</label>
+                        <input type="range" id="dupCnt" min="1" max="5" value="2">
+                        <span class="param-val" id="dupCntVal">2份</span>
+                    </div>
+                    <div class="param-group">
+                        <label>重复概率 %</label>
+                        <input type="range" id="dupPct" min="0" max="100" value="15">
+                        <span class="param-val" id="dupPctVal">15%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 篡改Tamper -->
+        <div class="func-item">
+            <input type="checkbox" class="check-box" id="tamperEnable">
+            <div class="func-desc">
+                <div class="func-title">🔹 Tamper 数据包校验篡改</div>
+                <div class="param-row">
+                    <div class="param-group">
+                        <label>篡改概率 %</label>
+                        <input type="range" id="tamperPct" min="0" max="100" value="8">
+                        <span class="param-val" id="tamperPctVal">8%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 预设模板 -->
+        <div class="preset-box">
+            <h3>常用弱网预设一键载入</h3>
+            <div class="preset-btns">
+                <button onclick="loadPreset('4g')">标准4G</button>
+                <button onclick="loadPreset('3g')">慢速3G</button>
+                <button onclick="loadPreset('metro')">地铁波动弱网</button>
+                <button onclick="loadPreset('cross')">跨境高延迟</button>
+                <button onclick="loadPreset('unstable')">高丢包不稳定</button>
+                <button onclick="clearAll()">清空全部参数</button>
+            </div>
+        </div>
+
+        <div class="operate-box">
+            <button class="btn-gen" onclick="generateConfig()">生成Clumsy配置文本</button>
+            <button class="btn-down" onclick="downloadBat()">下载一键启动批处理</button>
+        </div>
+        <textarea id="cfgOutput" readonly placeholder="配置内容将在此生成，可直接复制粘贴到Clumsy的config.txt"></textarea>
+        <p class="tip-text">
+        使用步骤：<br>
+        1. 下载 <a target="_blank" href="https://jagt.github.io/clumsy/download.html">Clumsy 官方程序</a> 解压到本地文件夹<br>
+        2. 复制上方配置内容，在Clumsy目录新建config.txt粘贴保存<br>
+        3. 运行clumsy.exe，点击Load读取配置，勾选Start即可全局生效弱网<br>
+        4. 或直接下载bat脚本，放在同目录双击一键载入配置并启动
+        </p>
+    </div>
+</div>
+<footer>© 2026 个人工具站点 | Clumsy参数生成面板</footer>
+
+<script>
+// 滑块数值实时显示
+function bindSlider(id, valId, suffix){
+    const inp = document.getElementById(id);
+    const show = document.getElementById(valId);
+    inp.oninput = ()=> show.textContent = inp.value + suffix;
+}
+bindSlider('lagOut','lagOutVal','ms');
+bindSlider('lagIn','lagInVal','ms');
+bindSlider('dropOut','dropOutVal','%');
+bindSlider('dropIn','dropInVal','%');
+bindSlider('throttleTime','throttleTimeVal','ms');
+bindSlider('orderPct','orderPctVal','%');
+bindSlider('dupCnt','dupCntVal','份');
+bindSlider('dupPct','dupPctVal','%');
+bindSlider('tamperPct','tamperPctVal','%');
+
+// 预设方案库
+const presets = {
+    4g:{
+        lagE:true,lagO:150,lagI:150,
+        dropE:false,dropO:5,dropI:5,
+        throE:false,throT:400,throO:true,throI:true,
+        ordE:false,ordP:10,
+        dupE:false,dupC:2,dupP:5,
+        tamE:false,tamP:3
+    },
+    3g:{
+        lagE:true,lagO:400,lagI:400,
+        dropE:true,dropO:12,dropI:12,
+        throE:true,throT:600,throO:true,throI:true,
+        ordE:true,ordP:18,
+        dupE:false,dupC:2,dupP:8,
+        tamE:false,tamP:4
+    },
+    metro:{
+        lagE:true,lagO:800,lagI:800,
+        dropE:true,dropO:28,dropI:28,
+        throE:true,throT:900,throO:true,throI:true,
+        ordE:true,ordP:35,
+        dupE:true,dupC:2,dupP:16,
+        tamE:true,tamP:7
+    },
+    cross:{
+        lagE:true,lagO:2200,lagI:2200,
+        dropE:true,dropO:6,dropI:6,
+        throE:false,throT:500,throO:false,throI:false,
+        ordE:false,ordP:12,
+        dupE:false,dupC:2,dupP:6,
+        tamE:false,tamP:2
+    },
+    unstable:{
+        lagE:true,lagO:600,lagI:600,
+        dropE:true,dropO:45,dropI:45,
+        throE:true,throT:700,throO:true,throI:true,
+        ordE:true,ordP:42,
+        dupE:true,dupC:3,dupP:22,
+        tamE:true,tamP:12
+    }
+};
+
+// 载入预设
+function loadPreset(key){
+    const p = presets[key];
+    document.getElementById('lagEnable').checked = p.lagE;
+    document.getElementById('lagOut').value = p.lagO;document.getElementById('lagOutVal').textContent=p.lagO+'ms';
+    document.getElementById('lagIn').value = p.lagI;document.getElementById('lagInVal').textContent=p.lagI+'ms';
+
+    document.getElementById('dropEnable').checked = p.dropE;
+    document.getElementById('dropOut').value = p.dropO;document.getElementById('dropOutVal').textContent=p.dropO+'%';
+    document.getElementById('dropIn').value = p.dropI;document.getElementById('dropInVal').textContent=p.dropI+'%';
+
+    document.getElementById('throttleEnable').checked = p.throE;
+    document.getElementById('throttleTime').value = p.throT;document.getElementById('throttleTimeVal').textContent=p.throT+'ms';
+    document.getElementById('throttleOut').checked = p.throO;
+    document.getElementById('throttleIn').checked = p.throI;
+
+    document.getElementById('orderEnable').checked = p.ordE;
+    document.getElementById('orderPct').value = p.ordP;document.getElementById('orderPctVal').textContent=p.ordP+'%';
+
+    document.getElementById('dupEnable').checked = p.dupE;
+    document.getElementById('dupCnt').value = p.dupC;document.getElementById('dupCntVal').textContent=p.dupC+'份';
+    document.getElementById('dupPct').value = p.dupP;document.getElementById('dupPctVal').textContent=p.dupP+'%';
+
+    document.getElementById('tamperEnable').checked = p.tamE;
+    document.getElementById('tamperPct').value = p.tamP;document.getElementById('tamperPctVal').textContent=p.tamP+'%';
+    generateConfig();
+}
+
+// 清空参数
+function clearAll(){
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
+    document.getElementById('lagOut').value=0;document.getElementById('lagOutVal').textContent='0ms';
+    document.getElementById('lagIn').value=0;document.getElementById('lagInVal').textContent='0ms';
+    document.getElementById('dropOut').value=0;document.getElementById('dropOutVal').textContent='0%';
+    document.getElementById('dropIn').value=0;document.getElementById('dropInVal').textContent='0%';
+    document.getElementById('orderPct').value=0;document.getElementById('orderPctVal').textContent='0%';
+    document.getElementById('dupPct').value=0;document.getElementById('dupPctVal').textContent='0%';
+    document.getElementById('tamperPct').value=0;document.getElementById('tamperPctVal').textContent='0%';
+    document.getElementById('cfgOutput').value='';
+}
+
+// 生成Clumsy标准配置文本
+function generateConfig(){
+    let cfg = `# Clumsy Auto Generate Config
+filter=outbound and ip.DstAddr >= 127.0.0.1 and ip.DstAddr <= 127.255.255.255
+start=0
+
+# Lag 延迟
+lag_enable=${document.getElementById('lagEnable').checked ? 1 : 0}
+lag_out=${document.getElementById('lagOut').value}
+lag_in=${document.getElementById('lagIn').value}
+
+# Drop 丢包
+drop_enable=${document.getElementById('dropEnable').checked ? 1 : 0}
+drop_out=${document.getElementById('dropOut').value}
+drop_in=${document.getElementById('dropIn').value}
+
+# Throttle 节流
+throttle_enable=${document.getElementById('throttleEnable').checked ? 1 : 0}
+throttle_time=${document.getElementById('throttleTime').value}
+throttle_out=${document.getElementById('throttleOut').checked ? 1 : 0}
+throttle_in=${document.getElementById('throttleIn').checked ? 1 : 0}
+
+# Out of Order 乱序
+order_enable=${document.getElementById('orderEnable').checked ? 1 : 0}
+order_pct=${document.getElementById('orderPct').value}
+
+# Duplicate 重复包
+dup_enable=${document.getElementById('dupEnable').checked ? 1 : 0}
+dup_cnt=${document.getElementById('dupCnt').value}
+dup_pct=${document.getElementById('dupPct').value}
+
+# Tamper 篡改校验
+tamper_enable=${document.getElementById('tamperEnable').checked ? 1 : 0}
+tamper_pct=${document.getElementById('tamperPct').value}
+`;
+    document.getElementById('cfgOutput').value = cfg;
+}
+
+// 下载bat一键启动脚本
+function downloadBat(){
+    const configText = document.getElementById('cfgOutput').value;
+    if(!configText){
+        alert('请先生成配置内容');
+        return;
+    }
+    const bat = `@echo off
+echo 自动写入clumsy配置并启动
+echo ${configText.replace(/\n/g,'\r\n')} > config.txt
+start clumsy.exe
+exit
+`;
+    const blob = new Blob([bat],{type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '启动弱网.bat';
+    a.click();
+}
+</script>
+</body>
+</html>
