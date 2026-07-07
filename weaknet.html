@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弱网模拟配置工具 | 延迟&丢包&限速</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,Microsoft YaHei}
+        body{background:#f7f9fc;color:#222}
+        header{background:#2563eb;color:#fff;padding:30px 20px;text-align:center}
+        h1{margin-bottom:10px;font-size:24px}
+        nav{background:#fff;padding:15px 20px;box-shadow:0 2px 6px #00000015}
+        nav a{text-decoration:none;color:#2563eb;margin:0 12px;font-size:16px}
+        nav a:hover{text-decoration:underline}
+        .container{max-width:700px;margin:40px auto;padding:0 20px}
+        .card{background:#fff;padding:28px;border-radius:12px;box-shadow:0 2px 12px #00000010;margin-bottom:24px}
+        .row{margin-bottom:20px}
+        label{display:block;margin-bottom:8px;font-weight:500}
+        input[type="number"],input[type="range"]{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:15px}
+        .range-wrap{display:flex;gap:10px;align-items:center}
+        .range-wrap input:nth-child(1){flex:1}
+        .tip-val{min-width:60px;text-align:center;color:#2563eb;font-weight:bold}
+        .preset{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+        .preset button{padding:8px 14px;border:1px solid #2563eb;background:#fff;color:#2563eb;border-radius:6px;cursor:pointer}
+        .preset button:hover{background:#2563eb;color:#fff}
+        .copy-box{margin-top:15px;padding:14px;background:#f0f7ff;border-radius:6px;word-break:break-all}
+        button.primary{background:#2563eb;color:white;border:none;padding:11px 22px;border-radius:6px;margin-top:12px;cursor:pointer;font-size:15px}
+        button.primary:hover{background:#1d4ed8}
+        .note{font-size:13px;color:#666;margin-top:6px;line-height:1.6}
+        footer{text-align:center;padding:30px;color:#777;font-size:14px;margin-top:60px}
+    </style>
+</head>
+<body>
+<header>
+    <h1>弱网环境配置工具（延迟 / 丢包 / 带宽限制）</h1>
+</header>
+<nav>
+    <a href="index.html">首页</a>
+    <a href="timestamp.html">时间戳工具</a>
+    <a href="weaknet.html">弱网模拟</a>
+</nav>
+<div class="container">
+    <div class="card">
+        <div class="row">
+            <label>固定请求延迟（ms）</label>
+            <div class="range-wrap">
+                <input type="range" id="delay" min="0" max="5000" value="300">
+                <span class="tip-val" id="delayText">300 ms</span>
+            </div>
+            <div class="preset">
+                <button onclick="setDelay(100)">100ms</button>
+                <button onclick="setDelay(500)">500ms</button>
+                <button onclick="setDelay(1000)">1s</button>
+                <button onclick="setDelay(3000)">3s</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <label>随机丢包概率（0~100%）</label>
+            <div class="range-wrap">
+                <input type="range" id="loss" min="0" max="100" value="0">
+                <span class="tip-val" id="lossText">0 %</span>
+            </div>
+            <div class="preset">
+                <button onclick="setLoss(0)">无丢包</button>
+                <button onclick="setLoss(10)">10%</button>
+                <button onclick="setLoss(30)">30%</button>
+                <button onclick="setLoss(50)">50%</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <label>下行带宽限速（kb/s）</label>
+            <div class="range-wrap">
+                <input type="range" id="down" min="10" max="10000" value="2000">
+                <span class="tip-val" id="downText">2000 kb/s</span>
+            </div>
+            <div class="preset">
+                <button onclick="setDown(512)">512kb</button>
+                <button onclick="setDown(1024)">1M</button>
+                <button onclick="setDown(4096)">4M</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <label>上行带宽限速（kb/s）</label>
+            <div class="range-wrap">
+                <input type="range" id="up" min="10" max="10000" value="1024">
+                <span class="tip-val" id="upText">1024 kb/s</span>
+            </div>
+        </div>
+
+        <button class="primary" onclick="genConfig()">生成Chrome DevTools弱网配置</button>
+        <div class="copy-box" id="cfgBox">配置JSON将显示在这里</div>
+        <button class="primary" onclick="copyCfg()" style="margin-top:8px">一键复制配置</button>
+
+        <p class="note">
+            使用方法：打开Chrome F12开发者工具 → Network面板 → 右上角Throttling下拉 → Custom → Add custom throttling → 粘贴JSON导入，即可全局对网页开启延迟+丢包+限速弱网，用来测试H5/网页APP弱网表现。
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>常用弱网预设模板</h3>
+        <div class="preset" style="margin-top:15px">
+            <button onclick="applyPreset('4g')">标准4G</button>
+            <button onclick="applyPreset('3g')">慢速3G</button>
+            <button onclick="applyPreset('edge')">极弱EDGE网</button>
+            <button onclick="applyPreset('highdelay')">高延迟国际链路</button>
+            <button onclick="applyPreset('unstable')">高丢包不稳定网络</button>
+        </div>
+    </div>
+</div>
+<footer>© 2026 个人工具站点</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+// 滑块数值同步
+$("#delay").oninput = ()=>$("#delayText").textContent = $("#delay").value + " ms";
+$("#loss").oninput = ()=>$("#lossText").textContent = $("#loss").value + " %";
+$("#down").oninput = ()=>$("#downText").textContent = $("#down").value + " kb/s";
+$("#up").oninput = ()=>$("#upText").textContent = $("#up").value + " kb/s";
+
+function setDelay(v){ $("#delay").value=v;$("#delayText").textContent=v+" ms"; }
+function setLoss(v){ $("#loss").value=v;$("#lossText").textContent=v+" %"; }
+function setDown(v){ $("#down").value=v;$("#downText").textContent=v+" kb/s"; }
+
+// 生成标准DevTools弱网JSON
+function genConfig(){
+    const delay = Number($("#delay").value);
+    const loss = Number($("#loss").value)/100;
+    const down = Number($("#down").value);
+    const up = Number($("#up").value);
+    const cfg = {
+        "download": down * 1024,
+        "upload": up * 1024,
+        "latency": delay,
+        "packetLoss": loss
+    };
+    $("#cfgBox").textContent = JSON.stringify(cfg,null,2);
+}
+
+function copyCfg(){
+    const text = $("#cfgBox").textContent;
+    if(!text||text.includes("将显示"))return alert("请先生成配置");
+    navigator.clipboard.writeText(text).then(()=>alert("复制成功，可粘贴到Chrome自定义节流"));
+}
+
+// 内置预设方案
+const presets = {
+    4g: {delay:150,loss:0,down:4096,up:2048},
+    3g: {delay:300,loss:0.05,down:1024,up:512},
+    edge: {delay:800,loss:0.15,down:256,up:128},
+    highdelay: {delay:2000,loss:0.02,down:2048,up:1024},
+    unstable: {delay:400,loss:0.4,down:1536,up:768}
+};
+function applyPreset(key){
+    const p = presets[key];
+    setDelay(p.delay);
+    setLoss(p.loss*100);
+    setDown(p.down);
+    $("#up").value = p.up;
+    $("#upText").textContent = p.up + " kb/s";
+    genConfig();
+}
+</script>
+</body>
+</html>
