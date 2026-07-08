@@ -19,9 +19,13 @@
         .card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 12px #00000010;margin-bottom:22px}
         .card h2{margin-bottom:16px;font-size:20px}
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+        .field{position:relative}
         .field label{display:block;font-weight:600;margin-bottom:8px}
         .field input,.field select{width:100%;padding:11px 12px;border:1px solid #d5dbe7;border-radius:8px;font-size:15px;outline:none;background:#fff}
         .field input:focus,.field select:focus{border-color:#2563eb}
+        .suggest-box{position:absolute;left:0;right:0;top:100%;margin-top:6px;max-height:240px;overflow:auto;background:#fff;border:1px solid #d5dbe7;border-radius:10px;box-shadow:0 10px 30px #00000012;z-index:20;display:none}
+        .suggest-item{padding:10px 12px;font-size:14px;color:#374151;cursor:pointer}
+        .suggest-item:hover,.suggest-item.active{background:#eff6ff;color:#1d4ed8}
         .btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
         button{background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:15px}
         button:hover{background:#1d4ed8}
@@ -95,8 +99,8 @@
                 </div>
                 <div class="field">
                     <label for="keyword">活动名称/类型</label>
-                    <input id="keyword" list="activitySuggestions" placeholder="例如：疯狂厨房 / 怪物攻城 / 系列礼包 / 打野宝藏">
-                    <datalist id="activitySuggestions"></datalist>
+                    <input id="keyword" placeholder="例如：疯狂厨房 / 怪物攻城 / 系列礼包 / 打野宝藏" autocomplete="off" autocapitalize="off" spellcheck="false">
+                    <div id="activitySuggestions" class="suggest-box"></div>
                 </div>
                 <div class="field">
                     <label for="activityIndexSelect">活动索引</label>
@@ -112,13 +116,6 @@
             <div class="btn-row">
                 <button id="queryBtn" type="button">开始查询</button>
                 <button id="compareBtn" type="button" class="secondary">对比</button>
-                <button id="exampleBtn" type="button" class="secondary">填入示例关键字</button>
-            </div>
-            <div class="hint">
-                当前按这些字段解析时间规则：<code>TimeType</code>、<code>StartTime</code>、<code>EndTime</code>、<code>DayOfWeek</code>、<code>OpenNumberWeek</code>、<code>DelayShowTime</code>、<code>ResetPeriod</code>、<code>ResetPeriodTimes</code>。<br>
-                若活动时间类型为 <code>创角当天0点</code>，请额外填写创角日期。<br>
-                可按 <code>活动名称/类型</code> 自动筛选活动索引，默认只查询“开启”状态的活动。<br>
-                如果同一个活动有多期，可在“活动索引”里指定具体哪一期。
             </div>
         </div>
 
@@ -207,7 +204,9 @@
 
         const appState = {
             datasets: [],
-            currentResultCount: 5
+            currentResultCount: 5,
+            suggestionValues: [],
+            activeSuggestionIndex: -1
         };
 
         const xmlFileInput = document.getElementById('xmlFile');
@@ -219,7 +218,6 @@
         const queryBtn = document.getElementById('queryBtn');
         const compareBtn = document.getElementById('compareBtn');
         const moreBtn = document.getElementById('moreBtn');
-        const exampleBtn = document.getElementById('exampleBtn');
         const statusBox = document.getElementById('statusBox');
         const nowText = document.getElementById('nowText');
         const datasetCount = document.getElementById('datasetCount');
@@ -233,15 +231,13 @@
         xmlFileInput.addEventListener('change', handleFileChange);
         projectSelect.addEventListener('change', refreshServerOptions);
         keywordInput.addEventListener('input', handleFilterInput);
+        keywordInput.addEventListener('focus', renderSuggestionList);
+        keywordInput.addEventListener('keydown', handleSuggestionKeydown);
         activityIndexSelect.addEventListener('change', runQuery);
         queryBtn.addEventListener('click', runQuery);
         compareBtn.addEventListener('click', compareCurrentSelection);
         moreBtn.addEventListener('click', handleLoadMore);
-        exampleBtn.addEventListener('click', () => {
-            keywordInput.value = '疯狂厨房';
-            syncActivityIndexOptions();
-            runQuery();
-        });
+        document.addEventListener('click', handleDocumentClick);
 
         initProjectOptions();
         updateNowText();
@@ -314,6 +310,7 @@
         }
 
         function handleFilterInput(){
+            renderSuggestionList();
             syncActivityIndexOptions();
         }
 
@@ -424,8 +421,94 @@
                     }
                 });
             });
-            suggestions.innerHTML = Array.from(names).sort((a, b) => a.localeCompare(b, 'zh-CN')).slice(0, 800)
-                .map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
+            appState.suggestionValues = Array.from(names).sort((a, b) => a.localeCompare(b, 'zh-CN')).slice(0, 800);
+            renderSuggestionList();
+        }
+
+        function renderSuggestionList(){
+            const keyword = keywordInput.value.trim().toLowerCase();
+            const items = appState.suggestionValues
+                .filter(value => !keyword || value.toLowerCase().includes(keyword))
+                .slice(0, 12);
+
+            appState.activeSuggestionIndex = items.length ? 0 : -1;
+
+            if(!items.length || document.activeElement !== keywordInput){
+                hideSuggestions();
+                return;
+            }
+
+            suggestions.innerHTML = items.map((value, index) => {
+                return `<div class="suggest-item${index === appState.activeSuggestionIndex ? ' active' : ''}" data-value="${escapeHtml(value)}">${escapeHtml(value)}</div>`;
+            }).join('');
+            suggestions.style.display = 'block';
+
+            Array.from(suggestions.querySelectorAll('.suggest-item')).forEach((node, index) => {
+                node.addEventListener('mousedown', event => {
+                    event.preventDefault();
+                    applySuggestion(items[index]);
+                });
+            });
+        }
+
+        function hideSuggestions(){
+            suggestions.style.display = 'none';
+            suggestions.innerHTML = '';
+            appState.activeSuggestionIndex = -1;
+        }
+
+        function applySuggestion(value){
+            keywordInput.value = value;
+            hideSuggestions();
+            syncActivityIndexOptions();
+        }
+
+        function handleSuggestionKeydown(event){
+            const visibleItems = Array.from(suggestions.querySelectorAll('.suggest-item'));
+            if(!visibleItems.length){
+                return;
+            }
+
+            if(event.key === 'ArrowDown'){
+                event.preventDefault();
+                appState.activeSuggestionIndex = Math.min(appState.activeSuggestionIndex + 1, visibleItems.length - 1);
+                updateSuggestionActiveState(visibleItems);
+                return;
+            }
+
+            if(event.key === 'ArrowUp'){
+                event.preventDefault();
+                appState.activeSuggestionIndex = Math.max(appState.activeSuggestionIndex - 1, 0);
+                updateSuggestionActiveState(visibleItems);
+                return;
+            }
+
+            if(event.key === 'Enter' && appState.activeSuggestionIndex >= 0){
+                event.preventDefault();
+                applySuggestion(visibleItems[appState.activeSuggestionIndex].textContent || '');
+                return;
+            }
+
+            if(event.key === 'Escape'){
+                hideSuggestions();
+            }
+        }
+
+        function updateSuggestionActiveState(nodes){
+            nodes.forEach((node, index) => {
+                node.classList.toggle('active', index === appState.activeSuggestionIndex);
+            });
+            const activeNode = nodes[appState.activeSuggestionIndex];
+            if(activeNode){
+                activeNode.scrollIntoView({block: 'nearest'});
+            }
+        }
+
+        function handleDocumentClick(event){
+            if(event.target === keywordInput || suggestions.contains(event.target)){
+                return;
+            }
+            hideSuggestions();
         }
 
         function getMatchedEntries(){
