@@ -12,7 +12,10 @@
         nav{background:#fff;padding:15px 20px;box-shadow:0 2px 6px #00000015}
         nav a{text-decoration:none;color:#2563eb;margin:0 12px;font-size:16px}
         nav a:hover{text-decoration:underline}
-        .container{max-width:1080px;margin:36px auto;padding:0 20px}
+        .container{max-width:1320px;margin:36px auto;padding:0 20px}
+        .layout{display:grid;grid-template-columns:minmax(380px,460px) minmax(0,1fr);gap:24px;align-items:start}
+        .sidebar{display:grid;gap:22px;position:sticky;top:20px}
+        .main{display:grid;gap:22px}
         .card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 12px #00000010;margin-bottom:22px}
         .card h2{margin-bottom:16px;font-size:20px}
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
@@ -35,6 +38,7 @@
         .result-item{border:1px solid #dbe3f0;border-radius:10px;padding:15px 16px;background:#fbfdff}
         .result-item .title{font-weight:700;color:#111;margin-bottom:6px}
         .result-item .sub{color:#4b5563;font-size:14px;line-height:1.7}
+        .result-item .sub.past{color:#dc2626;font-weight:600}
         .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:12px;margin-left:8px}
         .match-list{margin-top:12px;padding-left:20px;line-height:1.8}
         .dataset-block{border:1px solid #dbe3f0;border-radius:12px;padding:16px;background:#f8fbff}
@@ -52,6 +56,10 @@
             nav a{display:inline-block;margin:6px 10px}
             .container{padding:0 14px}
         }
+        @media (max-width:1080px){
+            .layout{grid-template-columns:1fr}
+            .sidebar{position:static}
+        }
     </style>
 </head>
 <body>
@@ -68,6 +76,8 @@
     </nav>
 
     <div class="container">
+        <div class="layout">
+        <div class="sidebar">
         <div class="card">
             <h2>导入与筛选</h2>
             <div class="grid">
@@ -92,13 +102,6 @@
                     <label for="activityIndexSelect">活动索引</label>
                     <select id="activityIndexSelect">
                         <option value="">请先输入活动名称并查询</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="resultCount">显示开启次数</label>
-                    <select id="resultCount">
-                        <option value="5">未来 5 个日期</option>
-                        <option value="10">未来 10 个日期</option>
                     </select>
                 </div>
                 <div class="field">
@@ -142,17 +145,24 @@
             </div>
             <ul id="matchList" class="match-list"></ul>
         </div>
+        </div>
 
+        <div class="main">
         <div class="card">
             <h2>开启结果</h2>
             <div id="resultList" class="result-list">
                 <div class="empty">导入配置表并输入活动关键字后，这里会显示未来开启日期。</div>
+            </div>
+            <div class="btn-row">
+                <button id="moreBtn" type="button" class="secondary" style="display:none">更多</button>
             </div>
         </div>
 
         <div class="card">
             <h2>对比结果</h2>
             <div id="compareResultBox" class="empty">选择至少两个活动配置表后，点击“对比”可查看相同点和不同点。</div>
+        </div>
+        </div>
         </div>
     </div>
 
@@ -196,7 +206,8 @@
         };
 
         const appState = {
-            datasets: []
+            datasets: [],
+            currentResultCount: 5
         };
 
         const xmlFileInput = document.getElementById('xmlFile');
@@ -204,10 +215,10 @@
         const keywordInput = document.getElementById('keyword');
         const activityIndexSelect = document.getElementById('activityIndexSelect');
         const serverSelect = document.getElementById('serverSelect');
-        const resultCountSelect = document.getElementById('resultCount');
         const characterCreateDateInput = document.getElementById('characterCreateDate');
         const queryBtn = document.getElementById('queryBtn');
         const compareBtn = document.getElementById('compareBtn');
+        const moreBtn = document.getElementById('moreBtn');
         const exampleBtn = document.getElementById('exampleBtn');
         const statusBox = document.getElementById('statusBox');
         const nowText = document.getElementById('nowText');
@@ -225,6 +236,7 @@
         activityIndexSelect.addEventListener('change', runQuery);
         queryBtn.addEventListener('click', runQuery);
         compareBtn.addEventListener('click', compareCurrentSelection);
+        moreBtn.addEventListener('click', handleLoadMore);
         exampleBtn.addEventListener('click', () => {
             keywordInput.value = '疯狂厨房';
             syncActivityIndexOptions();
@@ -274,6 +286,7 @@
                 activityCount.textContent = String(getAllActivities().length);
                 refreshSuggestions(getAllActivities());
                 resetActivityIndexOptions();
+                toggleMoreButton(false);
                 renderCompareEmpty('已载入多个活动配置表，点击“对比”查看相同点和不同点。');
                 setStatus(`导入成功：${datasets.map(item => item.name).join('、')}\n共解析到 ${getAllActivities().length} 条活动规则。`, 'ok');
                 runQuery();
@@ -285,14 +298,15 @@
                 matchCount.textContent = '0';
                 matchList.innerHTML = '';
                 resetActivityIndexOptions();
+                toggleMoreButton(false);
                 renderEmpty('配置表解析失败，请确认导入的是 H_活动.xml。');
                 renderCompareEmpty('配置表解析失败，暂时无法进行对比。');
                 setStatus(`解析失败：${error.message}`, 'error');
             }
         }
 
-        function resetActivityIndexOptions(){
-            activityIndexSelect.innerHTML = '<option value="">请先输入活动名称并查询</option>';
+        function resetActivityIndexOptions(text){
+            activityIndexSelect.innerHTML = `<option value="">${escapeHtml(text || '请先输入活动名称并查询')}</option>`;
         }
 
         function getAllActivities(){
@@ -301,6 +315,11 @@
 
         function handleFilterInput(){
             syncActivityIndexOptions();
+        }
+
+        function handleLoadMore(){
+            appState.currentResultCount += 5;
+            runQuery(false);
         }
 
         function parseActivityXml(text){
@@ -440,9 +459,12 @@
             return matchedEntries;
         }
 
-        function runQuery(){
+        function runQuery(resetCount = true){
             const nowMs = Date.now();
-            const resultCount = Number(resultCountSelect.value) || 5;
+            if(resetCount){
+                appState.currentResultCount = 5;
+            }
+            const resultCount = appState.currentResultCount;
             const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
             const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
             const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
@@ -452,6 +474,7 @@
                 matchList.innerHTML = '';
                 resetActivityIndexOptions();
                 renderEmpty('请先导入本地 H_活动.xml。');
+                toggleMoreButton(false);
                 return;
             }
 
@@ -467,12 +490,14 @@
             if(!matchedEntries.length){
                 renderEmpty('没有匹配到活动，请换一个关键字试试。');
                 setStatus('当前配置表已导入，但没有命中活动关键字。', '');
+                toggleMoreButton(false);
                 return;
             }
 
             if(!filteredEntries.length){
                 renderEmpty('当前活动索引没有匹配到规则，请重新选择。');
                 setStatus('已匹配到活动名称，但当前活动索引未命中规则。', 'error');
+                toggleMoreButton(false);
                 return;
             }
 
@@ -480,6 +505,7 @@
             if(requiresCharacterDate && !Number.isFinite(characterCreateMs)){
                 renderEmpty('匹配到了创角当天0点活动，请先填写创角日期。');
                 setStatus('当前查询包含“创角当天0点”活动，请先补充创角日期。', 'error');
+                toggleMoreButton(false);
                 return;
             }
 
@@ -488,16 +514,22 @@
             if(!occurrenceGroups.some(group => group.occurrences.length)){ 
                 renderEmpty('匹配到了活动规则，但在未来范围内没有可展示的开启日期。');
                 setStatus(`已匹配 ${filteredEntries.length} 条规则，但没有找到未来开启日期。`, '');
+                toggleMoreButton(false);
                 return;
             }
 
             renderOccurrences(occurrenceGroups, nowMs);
+            toggleMoreButton(occurrenceGroups.some(group => group.hasMore));
             setStatus(`已匹配 ${filteredEntries.length} 条规则，已按北京时间输出 ${occurrenceGroups.length} 个配置表的结果。`, 'ok');
+        }
+
+        function toggleMoreButton(visible){
+            moreBtn.style.display = visible ? 'inline-block' : 'none';
         }
 
         function updateActivityIndexOptions(entries, preferredValue){
             if(!entries.length){
-                resetActivityIndexOptions();
+                resetActivityIndexOptions(keywordInput.value.trim() ? '未有该活动' : '请先输入活动名称并查询');
                 return;
             }
 
@@ -530,12 +562,13 @@
                 if(!groups.has(entry.datasetName)){
                     groups.set(entry.datasetName, []);
                 }
-                const occurrences = buildOccurrences(entry.item, serverOpenMs, characterCreateMs, nowMs, resultCount);
-                groups.get(entry.datasetName).push(...occurrences);
+                const occurrenceSet = buildDisplayOccurrences(entry.item, serverOpenMs, characterCreateMs, nowMs, resultCount + 1);
+                groups.get(entry.datasetName).push(...occurrenceSet);
             });
 
             return Array.from(groups.entries()).map(([datasetName, occurrences]) => ({
                 datasetName,
+                hasMore: occurrences.length > resultCount,
                 occurrences: occurrences.sort((a, b) => a.startMs - b.startMs).slice(0, resultCount)
             }));
         }
@@ -566,6 +599,114 @@
                 }];
             }
             return [];
+        }
+
+        function buildDisplayOccurrences(item, serverOpenMs, characterCreateMs, nowMs, limit){
+            const futureOccurrences = buildOccurrences(item, serverOpenMs, characterCreateMs, nowMs, limit);
+            if(futureOccurrences.length){
+                return futureOccurrences;
+            }
+
+            const pastOccurrence = buildPastOccurrence(item, serverOpenMs, characterCreateMs, nowMs);
+            return pastOccurrence ? [pastOccurrence] : [];
+        }
+
+        function buildPastOccurrence(item, serverOpenMs, characterCreateMs, nowMs){
+            const type = item.timeType;
+            if(type === '固定时间'){
+                const startMs = parseBjDateTime(item.startTime);
+                const endMs = parseBjDateTime(item.endTime) || startMs;
+                if(Number.isFinite(startMs) && endMs < nowMs){
+                    return {startMs, endMs, item, isPast: true, note: '已结束'};
+                }
+                return null;
+            }
+
+            if(type === '相对开服时间'){
+                return buildPastRangeOccurrence(item, startOfBjDay(serverOpenMs), nowMs, '已结束');
+            }
+
+            if(type === '创角当天0点'){
+                if(!Number.isFinite(characterCreateMs)){
+                    return null;
+                }
+                return buildPastRangeOccurrence(item, startOfBjDay(characterCreateMs), nowMs, '基于创角日期计算 | 已结束');
+            }
+
+            if(type === '开服周几开启'){
+                const offsetDays = Math.max(0, toInt(item.startTime, 0));
+                const weekday = toJsWeekday(item.dayOfWeek);
+                const durationDays = Math.max(1, toInt(item.endTime, 1));
+                const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
+                const maxTimes = Math.max(0, toInt(item.resetPeriodTimes, 0));
+                if(weekday === null){
+                    return null;
+                }
+                const firstAnchor = startOfBjDay(serverOpenMs) + offsetDays * DAY_MS;
+                const firstStart = nextOrSameWeekday(firstAnchor, weekday);
+                return buildPastRecurringOccurrence(item, firstStart, durationDays, periodDays, maxTimes, nowMs);
+            }
+
+            if(type === '开服第几周周几'){
+                const openWeek = Math.max(1, toInt(item.openNumberWeek, 1));
+                const weekday = toJsWeekday(item.dayOfWeek);
+                const durationDays = Math.max(1, toInt(item.endTime, 1));
+                const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
+                const maxTimes = Math.max(0, toInt(item.resetPeriodTimes, 0));
+                if(weekday === null){
+                    return null;
+                }
+                const firstStart = getOpenNumberWeekStart(serverOpenMs, openWeek, weekday);
+                return buildPastRecurringOccurrence(item, firstStart, durationDays, periodDays, maxTimes, nowMs);
+            }
+
+            return null;
+        }
+
+        function buildPastRangeOccurrence(item, baseDayStart, nowMs, note){
+            const startDay = toInt(item.startTime, NaN);
+            const endDay = toInt(item.endTime, startDay);
+            if(!Number.isFinite(startDay) || !Number.isFinite(baseDayStart)){
+                return null;
+            }
+            const startOffsetDays = Math.max(0, startDay - 1);
+            const endOffsetDays = Math.max(startDay, endDay);
+            const startMs = baseDayStart + startOffsetDays * DAY_MS;
+            const endMs = baseDayStart + endOffsetDays * DAY_MS - 1000;
+            if(endMs < nowMs){
+                return {startMs, endMs, item, isPast: true, note};
+            }
+            return null;
+        }
+
+        function buildPastRecurringOccurrence(item, firstStart, durationDays, periodDays, maxTimes, nowMs){
+            if(!Number.isFinite(firstStart)){
+                return null;
+            }
+
+            let latest = null;
+            let startMs = firstStart;
+            let endMs = firstStart + durationDays * DAY_MS - 1000;
+            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const safePeriodDays = periodDays > 0 ? periodDays : 0;
+
+            for(let i = 0; i < loopLimit; i += 1){
+                if(endMs < nowMs){
+                    latest = {startMs, endMs, item, isPast: true, note: '已结束'};
+                } else {
+                    break;
+                }
+                if(!safePeriodDays){
+                    break;
+                }
+                startMs += safePeriodDays * DAY_MS;
+                endMs += safePeriodDays * DAY_MS;
+                if(startMs > nowMs + 730 * DAY_MS){
+                    break;
+                }
+            }
+
+            return latest;
         }
 
         function buildFixedDateOccurrences(item, nowMs){
@@ -772,14 +913,15 @@
                 const body = group.occurrences.length
                     ? group.occurrences.map(entry => {
                         const isActive = entry.startMs <= nowMs && nowMs <= entry.endMs;
+                        const isPast = Boolean(entry.isPast);
                         const label = entry.item.activityName || entry.item.indexName || entry.item.codeName;
                         const badge = isActive ? '<span class="tag">当前进行中</span>' : '';
                         const note = entry.note ? ` | ${escapeHtml(entry.note)}` : '';
                         return `
                     <div class="result-item">
                         <div class="title">${escapeHtml(label)}${badge}</div>
-                        <div class="sub">开启时间：${escapeHtml(formatBjShort(entry.startMs))}</div>
-                        <div class="sub">结束时间：${Number.isFinite(entry.endMs) ? escapeHtml(formatBjDateTime(entry.endMs)) : '长期开放'}</div>
+                        <div class="sub${isPast ? ' past' : ''}">开启时间：${escapeHtml(formatBjShort(entry.startMs))}${isPast ? '（已过去）' : ''}</div>
+                        <div class="sub${isPast ? ' past' : ''}">结束时间：${Number.isFinite(entry.endMs) ? escapeHtml(formatBjDateTime(entry.endMs)) : '长期开放'}</div>
                         <div class="sub">解锁条件：${escapeHtml(entry.item.joinUnlockTips || '无')}</div>
                         <div class="sub">规则类型：${escapeHtml(entry.item.timeType)} | 代码：${escapeHtml(entry.item.codeName || '-')} | 面板分类：${escapeHtml(entry.item.activityType || '-')}${note}</div>
                     </div>
@@ -793,7 +935,7 @@
 
         function compareCurrentSelection(){
             const nowMs = Date.now();
-            const resultCount = Number(resultCountSelect.value) || 5;
+            const resultCount = appState.currentResultCount;
             const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
             const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
             const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
