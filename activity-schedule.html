@@ -191,6 +191,12 @@
             ActivityName: 'activityName',
             ActivityType: 'activityType',
             ActivitySwitch: 'activitySwitch',
+            DisplayPersonalCondition: 'displayPersonalCondition',
+            DisplayPersonalConditionType: 'displayPersonalConditionType',
+            DisplayPersonalConditionValue: 'displayPersonalConditionValue',
+            JoinPersonalCondition: 'joinPersonalCondition',
+            JoinPersonalConditionType: 'joinPersonalConditionType',
+            JoinPersonalConditionValue: 'joinPersonalConditionValue',
             'JoinUnlockTips:C': 'joinUnlockTips',
             TimeType: 'timeType',
             StartTime: 'startTime',
@@ -1005,8 +1011,7 @@
                         <div class="title">${escapeHtml(label)}${badge}</div>
                         <div class="sub${isPast ? ' past' : ''}">开启时间：${escapeHtml(formatBjShort(entry.startMs))}${isPast ? '（已过去）' : ''}</div>
                         <div class="sub${isPast ? ' past' : ''}">结束时间：${Number.isFinite(entry.endMs) ? escapeHtml(formatBjDateTime(entry.endMs)) : '长期开放'}</div>
-                        <div class="sub">解锁条件：${escapeHtml(entry.item.joinUnlockTips || '无')}</div>
-                        <div class="sub">规则类型：${escapeHtml(entry.item.timeType)} | 代码：${escapeHtml(entry.item.codeName || '-')} | 面板分类：${escapeHtml(entry.item.activityType || '-')}${note}</div>
+                        <div class="sub">解锁条件：${escapeHtml(getUnlockConditionText(entry.item))}</div>
                     </div>
                 `;
                     }).join('')
@@ -1129,6 +1134,57 @@
         function renderCompareEmpty(text){
             compareResultBox.className = 'empty';
             compareResultBox.textContent = text;
+        }
+
+        function getUnlockConditionText(item){
+            if(item.joinUnlockTips){
+                return item.joinUnlockTips;
+            }
+
+            const joinText = formatConditionText(item.joinPersonalCondition, item.joinPersonalConditionType, item.joinPersonalConditionValue);
+            if(joinText){
+                return joinText;
+            }
+
+            const displayText = formatConditionText(item.displayPersonalCondition, item.displayPersonalConditionType, item.displayPersonalConditionValue);
+            return displayText || '无';
+        }
+
+        function formatConditionText(condition, type, value){
+            if(!condition && !type && (!value || value === '0')){
+                return '';
+            }
+
+            const typeName = type ? (type.includes('#') ? type.split('#').pop() : type) : '';
+            const normalizedValue = value && value !== '0' ? value : '';
+
+            if(condition === '默认开启'){
+                return '默认开启';
+            }
+
+            if(condition === '建筑' && typeName && normalizedValue){
+                return `${typeName}达到${normalizedValue}级解锁`;
+            }
+
+            if(condition === '系统解锁' && typeName && normalizedValue){
+                return `${typeName}达到${normalizedValue}级解锁`;
+            }
+
+            if(condition === '建筑' && typeName){
+                return `${typeName}解锁`;
+            }
+
+            const parts = [];
+            if(condition){
+                parts.push(condition);
+            }
+            if(typeName){
+                parts.push(typeName);
+            }
+            if(normalizedValue){
+                parts.push(normalizedValue);
+            }
+            return parts.join(' | ');
         }
 
         function renderEmpty(text){
