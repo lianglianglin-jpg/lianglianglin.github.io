@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活动开启时间查询工具</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,Microsoft YaHei}
+        body{background:#f7f9fc;color:#222}
+        header{background:#2563eb;color:#fff;padding:30px 20px;text-align:center}
+        h1{margin-bottom:10px;font-size:24px}
+        nav{background:#fff;padding:15px 20px;box-shadow:0 2px 6px #00000015}
+        nav a{text-decoration:none;color:#2563eb;margin:0 12px;font-size:16px}
+        nav a:hover{text-decoration:underline}
+        .container{max-width:1080px;margin:36px auto;padding:0 20px}
+        .card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 12px #00000010;margin-bottom:22px}
+        .card h2{margin-bottom:16px;font-size:20px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+        .field label{display:block;font-weight:600;margin-bottom:8px}
+        .field input,.field select{width:100%;padding:11px 12px;border:1px solid #d5dbe7;border-radius:8px;font-size:15px;outline:none;background:#fff}
+        .field input:focus,.field select:focus{border-color:#2563eb}
+        .btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+        button{background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:15px}
+        button:hover{background:#1d4ed8}
+        button.secondary{background:#e8eefc;color:#1d4ed8}
+        button.secondary:hover{background:#dbe6ff}
+        .hint{margin-top:10px;color:#666;font-size:13px;line-height:1.7}
+        .status{padding:14px 16px;border-radius:8px;background:#eff6ff;line-height:1.7;white-space:pre-wrap}
+        .status.error{background:#fef2f2;color:#b91c1c}
+        .status.ok{background:#ecfdf5;color:#166534}
+        .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:16px}
+        .meta-item{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+        .meta-item strong{display:block;color:#111;margin-bottom:6px}
+        .result-list{margin-top:18px;display:grid;gap:12px}
+        .result-item{border:1px solid #dbe3f0;border-radius:10px;padding:15px 16px;background:#fbfdff}
+        .result-item .title{font-weight:700;color:#111;margin-bottom:6px}
+        .result-item .sub{color:#4b5563;font-size:14px;line-height:1.7}
+        .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:12px;margin-left:8px}
+        .match-list{margin-top:12px;padding-left:20px;line-height:1.8}
+        .dataset-block{border:1px solid #dbe3f0;border-radius:12px;padding:16px;background:#f8fbff}
+        .dataset-title{font-size:16px;font-weight:700;color:#111;margin-bottom:10px}
+        .compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:16px}
+        .compare-card{border:1px solid #dbe3f0;border-radius:12px;padding:16px;background:#fbfdff}
+        .compare-card h3{font-size:16px;margin-bottom:10px}
+        .compare-list{padding-left:20px;line-height:1.8;color:#374151}
+        .compare-diff{margin-top:12px;padding:12px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa}
+        .compare-diff strong{display:block;margin-bottom:8px;color:#9a3412}
+        .muted{color:#666}
+        .empty{padding:18px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#f8fafc}
+        footer{text-align:center;padding:30px;color:#777;font-size:14px;margin-top:60px}
+        @media (max-width:720px){
+            nav a{display:inline-block;margin:6px 10px}
+            .container{padding:0 14px}
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>活动开启时间查询工具</h1>
+        <p>导入本地 H_活动.xml 后，按北京时间查询未来 5 个或 10 个开启日期</p>
+    </header>
+    <nav>
+        <a href="index.html">首页</a>
+        <a href="activity-schedule.html">活动开启查询</a>
+        <a href="timestamp.html">时间戳工具</a>
+        <a href="weaknet.html">弱网延迟丢包测试</a>
+        <a href="clumsy-panel.html">Clumsy弱网参数面板</a>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>导入与筛选</h2>
+            <div class="grid">
+                <div class="field">
+                    <label for="xmlFile">活动配置表（可多选）</label>
+                    <input id="xmlFile" type="file" accept=".xml" multiple>
+                </div>
+                <div class="field">
+                    <label for="projectSelect">项目</label>
+                    <select id="projectSelect"></select>
+                </div>
+                <div class="field">
+                    <label for="serverSelect">服务器</label>
+                    <select id="serverSelect"></select>
+                </div>
+                <div class="field">
+                    <label for="keyword">活动名称/类型</label>
+                    <input id="keyword" list="activitySuggestions" placeholder="例如：疯狂厨房 / 怪物攻城 / 系列礼包 / 打野宝藏">
+                    <datalist id="activitySuggestions"></datalist>
+                </div>
+                <div class="field">
+                    <label for="activityIndexSelect">活动索引</label>
+                    <select id="activityIndexSelect">
+                        <option value="">请先输入活动名称并查询</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="resultCount">显示开启次数</label>
+                    <select id="resultCount">
+                        <option value="5">未来 5 个日期</option>
+                        <option value="10">未来 10 个日期</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="characterCreateDate">创角日期（创角当天0点活动用）</label>
+                    <input id="characterCreateDate" type="date">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button id="queryBtn" type="button">开始查询</button>
+                <button id="compareBtn" type="button" class="secondary">对比</button>
+                <button id="exampleBtn" type="button" class="secondary">填入示例关键字</button>
+            </div>
+            <div class="hint">
+                当前按这些字段解析时间规则：<code>TimeType</code>、<code>StartTime</code>、<code>EndTime</code>、<code>DayOfWeek</code>、<code>OpenNumberWeek</code>、<code>DelayShowTime</code>、<code>ResetPeriod</code>、<code>ResetPeriodTimes</code>。<br>
+                若活动时间类型为 <code>创角当天0点</code>，请额外填写创角日期。<br>
+                可按 <code>活动名称/类型</code> 自动筛选活动索引，默认只查询“开启”状态的活动。<br>
+                如果同一个活动有多期，可在“活动索引”里指定具体哪一期。
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>查询状态</h2>
+            <div id="statusBox" class="status">请先导入本地活动配置表。</div>
+            <div class="meta">
+                <div class="meta-item">
+                    <strong>当前北京时间</strong>
+                    <div id="nowText">-</div>
+                </div>
+                <div class="meta-item">
+                    <strong>已载入配置表数量</strong>
+                    <div id="datasetCount">0</div>
+                </div>
+                <div class="meta-item">
+                    <strong>已载入活动数量</strong>
+                    <div id="activityCount">0</div>
+                </div>
+                <div class="meta-item">
+                    <strong>匹配规则数量</strong>
+                    <div id="matchCount">0</div>
+                </div>
+            </div>
+            <ul id="matchList" class="match-list"></ul>
+        </div>
+
+        <div class="card">
+            <h2>开启结果</h2>
+            <div id="resultList" class="result-list">
+                <div class="empty">导入配置表并输入活动关键字后，这里会显示未来开启日期。</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>对比结果</h2>
+            <div id="compareResultBox" class="empty">选择至少两个活动配置表后，点击“对比”可查看相同点和不同点。</div>
+        </div>
+    </div>
+
+    <footer>
+        © 2026 我的个人网站
+    </footer>
+
+    <script>
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        const BJ_OFFSET_MS = 8 * 60 * 60 * 1000;
+        const WEEK_NAMES = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+        const WEEKDAY_TO_JS = {1:1,2:2,3:3,4:4,5:5,6:6,7:0};
+        const PROJECTS = {
+            fl: {
+                name: 'FL项目',
+                servers: {
+                    s1: {name: '外网1服', openMs: createBjTimestamp(2025, 9, 26, 11, 0, 0)},
+                    s2: {name: '外网2服', openMs: createBjTimestamp(2025, 11, 25, 14, 0, 0)},
+                    s3: {name: '外网3服', openMs: createBjTimestamp(2026, 4, 27, 13, 0, 0)},
+                    s4: {name: '外网4服', openMs: createBjTimestamp(2026, 7, 1, 13, 0, 0)}
+                }
+            }
+        };
+
+        const fieldMap = {
+            Id: 'id',
+            Index: 'indexName',
+            'Code:C': 'codeName',
+            ActivityName: 'activityName',
+            ActivityType: 'activityType',
+            ActivitySwitch: 'activitySwitch',
+            'JoinUnlockTips:C': 'joinUnlockTips',
+            TimeType: 'timeType',
+            StartTime: 'startTime',
+            EndTime: 'endTime',
+            DayOfWeek: 'dayOfWeek',
+            OpenNumberWeek: 'openNumberWeek',
+            DelayShowTime: 'delayShowTime',
+            ResetPeriod: 'resetPeriod',
+            ResetPeriodTimes: 'resetPeriodTimes'
+        };
+
+        const appState = {
+            datasets: []
+        };
+
+        const xmlFileInput = document.getElementById('xmlFile');
+        const projectSelect = document.getElementById('projectSelect');
+        const keywordInput = document.getElementById('keyword');
+        const activityIndexSelect = document.getElementById('activityIndexSelect');
+        const serverSelect = document.getElementById('serverSelect');
+        const resultCountSelect = document.getElementById('resultCount');
+        const characterCreateDateInput = document.getElementById('characterCreateDate');
+        const queryBtn = document.getElementById('queryBtn');
+        const compareBtn = document.getElementById('compareBtn');
+        const exampleBtn = document.getElementById('exampleBtn');
+        const statusBox = document.getElementById('statusBox');
+        const nowText = document.getElementById('nowText');
+        const datasetCount = document.getElementById('datasetCount');
+        const activityCount = document.getElementById('activityCount');
+        const matchCount = document.getElementById('matchCount');
+        const matchList = document.getElementById('matchList');
+        const resultList = document.getElementById('resultList');
+        const compareResultBox = document.getElementById('compareResultBox');
+        const suggestions = document.getElementById('activitySuggestions');
+
+        xmlFileInput.addEventListener('change', handleFileChange);
+        projectSelect.addEventListener('change', refreshServerOptions);
+        keywordInput.addEventListener('input', handleFilterInput);
+        activityIndexSelect.addEventListener('change', runQuery);
+        queryBtn.addEventListener('click', runQuery);
+        compareBtn.addEventListener('click', compareCurrentSelection);
+        exampleBtn.addEventListener('click', () => {
+            keywordInput.value = '疯狂厨房';
+            syncActivityIndexOptions();
+            runQuery();
+        });
+
+        initProjectOptions();
+        updateNowText();
+        setInterval(updateNowText, 1000);
+
+        function initProjectOptions(){
+            projectSelect.innerHTML = Object.entries(PROJECTS).map(([key, project]) => {
+                return `<option value="${escapeHtml(key)}">${escapeHtml(project.name)}</option>`;
+            }).join('');
+            projectSelect.value = 'fl';
+            refreshServerOptions();
+        }
+
+        function refreshServerOptions(){
+            const project = PROJECTS[projectSelect.value] || PROJECTS.fl;
+            serverSelect.innerHTML = Object.entries(project.servers).map(([key, server]) => {
+                return `<option value="${escapeHtml(key)}">${escapeHtml(server.name)} | ${escapeHtml(formatBjDateTime(server.openMs).slice(0, 16))}</option>`;
+            }).join('');
+            if(project.servers.s4){
+                serverSelect.value = 's4';
+            }
+        }
+
+        async function handleFileChange(event){
+            const files = Array.from(event.target.files || []);
+            if(!files.length){
+                return;
+            }
+
+            setStatus(`正在读取 ${files.length} 个配置表...`, '');
+            try{
+                const datasets = await Promise.all(files.map(async file => {
+                    const text = await file.text();
+                    return {
+                        name: file.name,
+                        activities: parseActivityXml(text)
+                    };
+                }));
+
+                appState.datasets = datasets;
+                datasetCount.textContent = String(datasets.length);
+                activityCount.textContent = String(getAllActivities().length);
+                refreshSuggestions(getAllActivities());
+                resetActivityIndexOptions();
+                renderCompareEmpty('已载入多个活动配置表，点击“对比”查看相同点和不同点。');
+                setStatus(`导入成功：${datasets.map(item => item.name).join('、')}\n共解析到 ${getAllActivities().length} 条活动规则。`, 'ok');
+                runQuery();
+            }catch(error){
+                console.error(error);
+                appState.datasets = [];
+                datasetCount.textContent = '0';
+                activityCount.textContent = '0';
+                matchCount.textContent = '0';
+                matchList.innerHTML = '';
+                resetActivityIndexOptions();
+                renderEmpty('配置表解析失败，请确认导入的是 H_活动.xml。');
+                renderCompareEmpty('配置表解析失败，暂时无法进行对比。');
+                setStatus(`解析失败：${error.message}`, 'error');
+            }
+        }
+
+        function resetActivityIndexOptions(){
+            activityIndexSelect.innerHTML = '<option value="">请先输入活动名称并查询</option>';
+        }
+
+        function getAllActivities(){
+            return appState.datasets.flatMap(dataset => dataset.activities);
+        }
+
+        function handleFilterInput(){
+            syncActivityIndexOptions();
+        }
+
+        function parseActivityXml(text){
+            const xml = new DOMParser().parseFromString(text, 'application/xml');
+            const parserError = xml.getElementsByTagName('parsererror')[0];
+            if(parserError){
+                throw new Error('XML 格式不正确，浏览器无法解析。');
+            }
+
+            const worksheet = Array.from(xml.getElementsByTagNameNS('urn:schemas-microsoft-com:office:spreadsheet', 'Worksheet'))
+                .find(node => getAttr(node, 'Name') === 'Activity');
+            if(!worksheet){
+                throw new Error('未找到 Activity 工作表。');
+            }
+
+            const table = worksheet.getElementsByTagNameNS('urn:schemas-microsoft-com:office:spreadsheet', 'Table')[0];
+            if(!table){
+                throw new Error('未找到 Activity 表格。');
+            }
+
+            const rows = Array.from(table.getElementsByTagNameNS('urn:schemas-microsoft-com:office:spreadsheet', 'Row'));
+            if(rows.length < 4){
+                throw new Error('Activity 表数据不足。');
+            }
+
+            const headers = rowToValues(rows[1]);
+            const dataRows = rows.slice(4);
+            const activities = [];
+
+            dataRows.forEach(row => {
+                const values = rowToValues(row, headers.length);
+                if(!values.length || !String(values[0] || '').trim()){
+                    return;
+                }
+
+                const item = {};
+                headers.forEach((header, index) => {
+                    if(!fieldMap[header]){
+                        return;
+                    }
+                    item[fieldMap[header]] = normalizeValue(values[index]);
+                });
+
+                if(!item.timeType || !item.activityName){
+                    return;
+                }
+
+                activities.push(item);
+            });
+
+            return activities;
+        }
+
+        function rowToValues(row, size){
+            const cells = Array.from(row.getElementsByTagNameNS('urn:schemas-microsoft-com:office:spreadsheet', 'Cell'));
+            const values = [];
+            let cursor = 0;
+
+            cells.forEach(cell => {
+                const rawIndex = Number(getAttr(cell, 'Index'));
+                if(Number.isFinite(rawIndex) && rawIndex > 0){
+                    cursor = rawIndex - 1;
+                }
+                const data = cell.getElementsByTagNameNS('urn:schemas-microsoft-com:office:spreadsheet', 'Data')[0];
+                values[cursor] = data ? data.textContent.trim() : '';
+                cursor += 1;
+            });
+
+            if(size){
+                for(let i = 0; i < size; i += 1){
+                    if(values[i] === undefined){
+                        values[i] = '';
+                    }
+                }
+            }
+
+            return values;
+        }
+
+        function getAttr(node, localName){
+            if(!node || !node.attributes){
+                return '';
+            }
+            for(const attr of Array.from(node.attributes)){
+                if(attr.localName === localName || attr.name === localName || attr.name.endsWith(':' + localName)){
+                    return attr.value;
+                }
+            }
+            return '';
+        }
+
+        function normalizeValue(value){
+            return String(value || '').trim();
+        }
+
+        function refreshSuggestions(activities){
+            const names = new Set();
+            activities.forEach(item => {
+                [item.activityName, item.activityType, item.indexName, item.codeName].forEach(text => {
+                    if(text){
+                        names.add(text);
+                    }
+                });
+            });
+            suggestions.innerHTML = Array.from(names).sort((a, b) => a.localeCompare(b, 'zh-CN')).slice(0, 800)
+                .map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
+        }
+
+        function getMatchedEntries(){
+            const keyword = keywordInput.value.trim().toLowerCase();
+            return appState.datasets.flatMap(dataset => {
+                return dataset.activities
+                    .filter(item => {
+                        if(item.activitySwitch && item.activitySwitch !== '开启'){
+                            return false;
+                        }
+
+                        const matchKeyword = !keyword || [item.activityName, item.activityType, item.indexName, item.codeName]
+                            .join(' ')
+                            .toLowerCase()
+                            .includes(keyword);
+
+                        return matchKeyword;
+                    })
+                    .map(item => ({datasetName: dataset.name, item}));
+            });
+        }
+
+        function syncActivityIndexOptions(){
+            if(!appState.datasets.length){
+                resetActivityIndexOptions();
+                return [];
+            }
+            const selectedIndexValue = activityIndexSelect.value;
+            const matchedEntries = getMatchedEntries();
+            updateActivityIndexOptions(matchedEntries, selectedIndexValue);
+            return matchedEntries;
+        }
+
+        function runQuery(){
+            const nowMs = Date.now();
+            const resultCount = Number(resultCountSelect.value) || 5;
+            const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
+            const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
+            const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
+
+            if(!appState.datasets.length){
+                matchCount.textContent = '0';
+                matchList.innerHTML = '';
+                resetActivityIndexOptions();
+                renderEmpty('请先导入本地 H_活动.xml。');
+                return;
+            }
+
+            const matchedEntries = syncActivityIndexOptions();
+
+            const filteredEntries = activityIndexSelect.value
+                ? matchedEntries.filter(entry => buildActivityOptionValue(entry.item) === activityIndexSelect.value)
+                : matchedEntries;
+
+            matchCount.textContent = String(filteredEntries.length);
+            renderMatchedRules(filteredEntries);
+
+            if(!matchedEntries.length){
+                renderEmpty('没有匹配到活动，请换一个关键字试试。');
+                setStatus('当前配置表已导入，但没有命中活动关键字。', '');
+                return;
+            }
+
+            if(!filteredEntries.length){
+                renderEmpty('当前活动索引没有匹配到规则，请重新选择。');
+                setStatus('已匹配到活动名称，但当前活动索引未命中规则。', 'error');
+                return;
+            }
+
+            const requiresCharacterDate = filteredEntries.some(entry => entry.item.timeType === '创角当天0点');
+            if(requiresCharacterDate && !Number.isFinite(characterCreateMs)){
+                renderEmpty('匹配到了创角当天0点活动，请先填写创角日期。');
+                setStatus('当前查询包含“创角当天0点”活动，请先补充创角日期。', 'error');
+                return;
+            }
+
+            const occurrenceGroups = buildOccurrenceGroups(filteredEntries, serverOpenMs, characterCreateMs, nowMs, resultCount);
+
+            if(!occurrenceGroups.some(group => group.occurrences.length)){ 
+                renderEmpty('匹配到了活动规则，但在未来范围内没有可展示的开启日期。');
+                setStatus(`已匹配 ${filteredEntries.length} 条规则，但没有找到未来开启日期。`, '');
+                return;
+            }
+
+            renderOccurrences(occurrenceGroups, nowMs);
+            setStatus(`已匹配 ${filteredEntries.length} 条规则，已按北京时间输出 ${occurrenceGroups.length} 个配置表的结果。`, 'ok');
+        }
+
+        function updateActivityIndexOptions(entries, preferredValue){
+            if(!entries.length){
+                resetActivityIndexOptions();
+                return;
+            }
+
+            const options = ['<option value="">全部匹配索引</option>'];
+            const unique = new Map();
+            entries.forEach(entry => {
+                const value = buildActivityOptionValue(entry.item);
+                if(unique.has(value)){
+                    return;
+                }
+                const item = entry.item;
+                unique.set(value, `${item.indexName || '-'} | ${item.activityName || '-'} | ${item.codeName || '-'} | Id:${item.id || '-'}`);
+            });
+            unique.forEach((text, value) => {
+                options.push(`<option value="${escapeHtml(value)}">${escapeHtml(text)}</option>`);
+            });
+            activityIndexSelect.innerHTML = options.join('');
+
+            const canRestore = entries.some(entry => buildActivityOptionValue(entry.item) === preferredValue);
+            activityIndexSelect.value = canRestore ? preferredValue : '';
+        }
+
+        function buildActivityOptionValue(item){
+            return [item.indexName, item.codeName, item.activityName].join('|');
+        }
+
+        function buildOccurrenceGroups(entries, serverOpenMs, characterCreateMs, nowMs, resultCount){
+            const groups = new Map();
+            entries.forEach(entry => {
+                if(!groups.has(entry.datasetName)){
+                    groups.set(entry.datasetName, []);
+                }
+                const occurrences = buildOccurrences(entry.item, serverOpenMs, characterCreateMs, nowMs, resultCount);
+                groups.get(entry.datasetName).push(...occurrences);
+            });
+
+            return Array.from(groups.entries()).map(([datasetName, occurrences]) => ({
+                datasetName,
+                occurrences: occurrences.sort((a, b) => a.startMs - b.startMs).slice(0, resultCount)
+            }));
+        }
+
+        function buildOccurrences(item, serverOpenMs, characterCreateMs, nowMs, limit){
+            const type = item.timeType;
+            if(type === '固定时间'){
+                return buildFixedDateOccurrences(item, nowMs);
+            }
+            if(type === '相对开服时间'){
+                return buildOpenServiceOccurrences(item, serverOpenMs, nowMs);
+            }
+            if(type === '创角当天0点'){
+                return buildCharacterCreate0Occurrences(item, characterCreateMs, nowMs);
+            }
+            if(type === '开服周几开启'){
+                return buildLaunchWeekOccurrences(item, serverOpenMs, nowMs, limit);
+            }
+            if(type === '开服第几周周几'){
+                return buildOpenNumberWeekOccurrences(item, serverOpenMs, nowMs, limit);
+            }
+            if(type === '永久开放'){
+                return [{
+                    startMs: nowMs,
+                    endMs: Infinity,
+                    item,
+                    note: '永久开放'
+                }];
+            }
+            return [];
+        }
+
+        function buildFixedDateOccurrences(item, nowMs){
+            const startMs = parseBjDateTime(item.startTime);
+            const endMs = parseBjDateTime(item.endTime) || startMs;
+            if(!startMs || endMs < nowMs){
+                return [];
+            }
+            return [{startMs, endMs, item}];
+        }
+
+        function buildOpenServiceOccurrences(item, serverOpenMs, nowMs){
+            const startDay = toInt(item.startTime, NaN);
+            const endDay = toInt(item.endTime, startDay);
+            if(!Number.isFinite(startDay)){
+                return [];
+            }
+
+            const openDayStart = startOfBjDay(serverOpenMs);
+            const startOffsetDays = Math.max(0, startDay - 1);
+            const endOffsetDays = Math.max(startDay, endDay);
+            const startMs = openDayStart + startOffsetDays * DAY_MS;
+            const endMs = openDayStart + endOffsetDays * DAY_MS - 1000;
+            if(endMs < nowMs){
+                return [];
+            }
+            return [{startMs, endMs, item}];
+        }
+
+        function buildCharacterCreate0Occurrences(item, characterCreateMs, nowMs){
+            const startDay = toInt(item.startTime, NaN);
+            const endDay = toInt(item.endTime, startDay);
+            if(!Number.isFinite(startDay) || !Number.isFinite(characterCreateMs)){
+                return [];
+            }
+
+            const createDayStart = startOfBjDay(characterCreateMs);
+            const startOffsetDays = Math.max(0, startDay - 1);
+            const endOffsetDays = Math.max(startDay, endDay);
+            const startMs = createDayStart + startOffsetDays * DAY_MS;
+            const endMs = createDayStart + endOffsetDays * DAY_MS - 1000;
+            if(endMs < nowMs){
+                return [];
+            }
+            return [{startMs, endMs, item, note: '基于创角日期计算'}];
+        }
+
+        function buildLaunchWeekOccurrences(item, serverOpenMs, nowMs, limit){
+            const offsetDays = Math.max(0, toInt(item.startTime, 0));
+            const weekday = toJsWeekday(item.dayOfWeek);
+            const durationDays = Math.max(1, toInt(item.endTime, 1));
+            const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
+            const maxTimes = Math.max(0, toInt(item.resetPeriodTimes, 0));
+            if(weekday === null){
+                return [];
+            }
+
+            const firstAnchor = startOfBjDay(serverOpenMs) + offsetDays * DAY_MS;
+            const firstStart = nextOrSameWeekday(firstAnchor, weekday);
+            return buildRecurringList(item, firstStart, durationDays, periodDays, maxTimes, nowMs, limit);
+        }
+
+        function buildOpenNumberWeekOccurrences(item, serverOpenMs, nowMs, limit){
+            const openWeek = Math.max(1, toInt(item.openNumberWeek, 1));
+            const weekday = toJsWeekday(item.dayOfWeek);
+            const durationDays = Math.max(1, toInt(item.endTime, 1));
+            const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
+            const maxTimes = Math.max(0, toInt(item.resetPeriodTimes, 0));
+            if(weekday === null){
+                return [];
+            }
+
+            const firstStart = getOpenNumberWeekStart(serverOpenMs, openWeek, weekday);
+            return buildRecurringList(item, firstStart, durationDays, periodDays, maxTimes, nowMs, limit);
+        }
+
+        // 规则说明：
+        // 开服第N周周几 = 以开服当天为第1周起点，每7天为一周。
+        // 例如开服第3周周日：先找到开服后第3个7天区间的起始日，再取该区间内的周日。
+        function getOpenNumberWeekStart(serverOpenMs, openWeek, weekday){
+            const weekAnchor = startOfBjDay(serverOpenMs) + (openWeek - 1) * 7 * DAY_MS;
+            return nextOrSameWeekday(weekAnchor, weekday);
+        }
+
+        function buildRecurringList(item, firstStart, durationDays, periodDays, maxTimes, nowMs, limit){
+            if(!Number.isFinite(firstStart)){
+                return [];
+            }
+            const result = [];
+            let startMs = firstStart;
+            let endMs = firstStart + durationDays * DAY_MS - 1000;
+            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const safePeriodDays = periodDays > 0 ? periodDays : 0;
+
+            for(let i = 0; i < loopLimit; i += 1){
+                if(endMs >= nowMs){
+                    result.push({startMs, endMs, item});
+                }
+                if(result.length >= limit){
+                    break;
+                }
+                if(!safePeriodDays){
+                    break;
+                }
+                startMs += safePeriodDays * DAY_MS;
+                endMs += safePeriodDays * DAY_MS;
+                if(startMs > nowMs + 730 * DAY_MS){
+                    break;
+                }
+            }
+            return result;
+        }
+
+        function toInt(value, fallback){
+            const parsed = Number.parseInt(String(value || '').trim(), 10);
+            return Number.isFinite(parsed) ? parsed : fallback;
+        }
+
+        function toJsWeekday(value){
+            const parsed = toInt(value, NaN);
+            if(!Number.isFinite(parsed) || WEEKDAY_TO_JS[parsed] === undefined){
+                return null;
+            }
+            return WEEKDAY_TO_JS[parsed];
+        }
+
+        function nextOrSameWeekday(startMs, jsWeekday){
+            const dayStart = startOfBjDay(startMs);
+            const currentWeekday = bjWeekday(dayStart);
+            const delta = (jsWeekday - currentWeekday + 7) % 7;
+            return dayStart + delta * DAY_MS;
+        }
+
+        function createBjTimestamp(year, month, day, hour, minute, second){
+            return Date.UTC(year, month - 1, day, hour - 8, minute, second);
+        }
+
+        function parseBjDateTime(text){
+            const match = String(text || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+            if(!match){
+                return NaN;
+            }
+            return createBjTimestamp(
+                Number(match[1]),
+                Number(match[2]),
+                Number(match[3]),
+                Number(match[4] || 0),
+                Number(match[5] || 0),
+                Number(match[6] || 0)
+            );
+        }
+
+        function startOfBjDay(ms){
+            const pseudo = new Date(ms + BJ_OFFSET_MS);
+            return Date.UTC(
+                pseudo.getUTCFullYear(),
+                pseudo.getUTCMonth(),
+                pseudo.getUTCDate(),
+                0, 0, 0, 0
+            ) - BJ_OFFSET_MS;
+        }
+
+        function bjWeekday(ms){
+            return new Date(ms + BJ_OFFSET_MS).getUTCDay();
+        }
+
+        function formatBjDateTime(ms){
+            const pseudo = new Date(ms + BJ_OFFSET_MS);
+            const year = pseudo.getUTCFullYear();
+            const month = String(pseudo.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(pseudo.getUTCDate()).padStart(2, '0');
+            const hour = String(pseudo.getUTCHours()).padStart(2, '0');
+            const minute = String(pseudo.getUTCMinutes()).padStart(2, '0');
+            const second = String(pseudo.getUTCSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        }
+
+        function formatBjShort(ms){
+            const pseudo = new Date(ms + BJ_OFFSET_MS);
+            const month = pseudo.getUTCMonth() + 1;
+            const day = pseudo.getUTCDate();
+            const hour = String(pseudo.getUTCHours()).padStart(2, '0');
+            const minute = String(pseudo.getUTCMinutes()).padStart(2, '0');
+            const weekday = WEEK_NAMES[pseudo.getUTCDay()];
+            return `${month}月${day}日 ${weekday} ${hour}:${minute}`;
+        }
+
+        function updateNowText(){
+            nowText.textContent = formatBjDateTime(Date.now());
+        }
+
+        function renderMatchedRules(entries){
+            if(!entries.length){
+                matchList.innerHTML = '';
+                return;
+            }
+            matchList.innerHTML = entries.slice(0, 12).map(entry => {
+                return `<li>${escapeHtml(entry.datasetName)} | ${escapeHtml(entry.item.activityName)} <span class="muted">| ${escapeHtml(entry.item.timeType)} | ${escapeHtml(entry.item.codeName || entry.item.indexName || '-')}</span></li>`;
+            }).join('');
+        }
+
+        function renderOccurrences(groups, nowMs){
+            resultList.innerHTML = groups.map(group => {
+                const body = group.occurrences.length
+                    ? group.occurrences.map(entry => {
+                        const isActive = entry.startMs <= nowMs && nowMs <= entry.endMs;
+                        const label = entry.item.activityName || entry.item.indexName || entry.item.codeName;
+                        const badge = isActive ? '<span class="tag">当前进行中</span>' : '';
+                        const note = entry.note ? ` | ${escapeHtml(entry.note)}` : '';
+                        return `
+                    <div class="result-item">
+                        <div class="title">${escapeHtml(label)}${badge}</div>
+                        <div class="sub">开启时间：${escapeHtml(formatBjShort(entry.startMs))}</div>
+                        <div class="sub">结束时间：${Number.isFinite(entry.endMs) ? escapeHtml(formatBjDateTime(entry.endMs)) : '长期开放'}</div>
+                        <div class="sub">解锁条件：${escapeHtml(entry.item.joinUnlockTips || '无')}</div>
+                        <div class="sub">规则类型：${escapeHtml(entry.item.timeType)} | 代码：${escapeHtml(entry.item.codeName || '-')} | 面板分类：${escapeHtml(entry.item.activityType || '-')}${note}</div>
+                    </div>
+                `;
+                    }).join('')
+                    : '<div class="empty">该配置表下没有可展示的未来开启日期。</div>';
+
+                return `<div class="dataset-block"><div class="dataset-title">${escapeHtml(group.datasetName)}</div>${body}</div>`;
+            }).join('');
+        }
+
+        function compareCurrentSelection(){
+            const nowMs = Date.now();
+            const resultCount = Number(resultCountSelect.value) || 5;
+            const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
+            const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
+            const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
+
+            if(appState.datasets.length < 2){
+                renderCompareEmpty('请至少导入两个活动配置表后再进行对比。');
+                return;
+            }
+
+            const matchedEntries = syncActivityIndexOptions();
+            if(!matchedEntries.length){
+                renderCompareEmpty('当前筛选条件没有命中活动，无法对比。');
+                return;
+            }
+
+            const uniqueKeys = Array.from(new Set(matchedEntries.map(entry => buildActivityOptionValue(entry.item))));
+            if(!activityIndexSelect.value && uniqueKeys.length > 1){
+                renderCompareEmpty('当前命中了多个活动索引，请先选择具体活动索引再对比。');
+                return;
+            }
+
+            const filteredEntries = activityIndexSelect.value
+                ? matchedEntries.filter(entry => buildActivityOptionValue(entry.item) === activityIndexSelect.value)
+                : matchedEntries;
+
+            if(filteredEntries.some(entry => entry.item.timeType === '创角当天0点') && !Number.isFinite(characterCreateMs)){
+                renderCompareEmpty('当前对比包含“创角当天0点”活动，请先填写创角日期。');
+                return;
+            }
+
+            const datasetNames = appState.datasets.map(dataset => dataset.name);
+            const datasetSummaries = datasetNames.map(datasetName => {
+                const entry = filteredEntries.find(item => item.datasetName === datasetName) || null;
+                const rule = entry ? entry.item : null;
+                const occurrences = rule ? buildOccurrences(rule, serverOpenMs, characterCreateMs, nowMs, resultCount) : [];
+                return {
+                    datasetName,
+                    rule,
+                    occurrences
+                };
+            });
+
+            const sameParts = [];
+            const diffParts = [];
+            const comparableFields = [
+                ['activityName', '活动名称'],
+                ['activityType', '活动类型'],
+                ['indexName', '活动索引'],
+                ['timeType', '时间类型'],
+                ['startTime', '开始时间'],
+                ['endTime', '结束时间'],
+                ['dayOfWeek', '周几开启'],
+                ['openNumberWeek', '开服第几周'],
+                ['resetPeriod', '重置周期'],
+                ['resetPeriodTimes', '重置次数'],
+                ['joinUnlockTips', '解锁条件']
+            ];
+
+            comparableFields.forEach(([field, label]) => {
+                const values = datasetSummaries.map(summary => summary.rule ? (summary.rule[field] || '空') : '缺失');
+                const uniqueValues = Array.from(new Set(values));
+                if(uniqueValues.length === 1){
+                    sameParts.push(`${label}：${uniqueValues[0]}`);
+                }else{
+                    diffParts.push({
+                        label,
+                        values: datasetSummaries.map((summary, index) => `${summary.datasetName}：${values[index]}`)
+                    });
+                }
+            });
+
+            const occurrenceValues = datasetSummaries.map(summary => {
+                if(!summary.occurrences.length){
+                    return '无未来开启日期';
+                }
+                return summary.occurrences.map(entry => `${formatBjShort(entry.startMs)} ~ ${formatBjDateTime(entry.endMs)}`).join('；');
+            });
+            const uniqueOccurrenceValues = Array.from(new Set(occurrenceValues));
+            if(uniqueOccurrenceValues.length === 1){
+                sameParts.push(`开启结果：${uniqueOccurrenceValues[0]}`);
+            }else{
+                diffParts.push({
+                    label: '开启结果',
+                    values: datasetSummaries.map((summary, index) => `${summary.datasetName}：${occurrenceValues[index]}`)
+                });
+            }
+
+            compareResultBox.className = '';
+            compareResultBox.innerHTML = `
+                <div class="compare-grid">
+                    <div class="compare-card">
+                        <h3>相同部分</h3>
+                        ${sameParts.length ? `<ul class="compare-list">${sameParts.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<div class="empty">没有完全相同的字段。</div>'}
+                    </div>
+                    <div class="compare-card">
+                        <h3>不同部分</h3>
+                        ${diffParts.length ? diffParts.map(item => `
+                            <div class="compare-diff">
+                                <strong>${escapeHtml(item.label)}</strong>
+                                <ul class="compare-list">${item.values.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>
+                            </div>
+                        `).join('') : '<div class="empty">没有差异，所有关键字段都一致。</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCompareEmpty(text){
+            compareResultBox.className = 'empty';
+            compareResultBox.textContent = text;
+        }
+
+        function renderEmpty(text){
+            resultList.innerHTML = `<div class="empty">${escapeHtml(text)}</div>`;
+        }
+
+        function setStatus(text, type){
+            statusBox.className = 'status' + (type ? ' ' + type : '');
+            statusBox.textContent = text;
+        }
+
+        function escapeHtml(text){
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+</html>
