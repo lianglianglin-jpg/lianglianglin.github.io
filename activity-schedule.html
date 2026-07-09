@@ -45,14 +45,6 @@
         .result-item .sub.past{color:#dc2626;font-weight:600}
         .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:12px;margin-left:8px}
         .match-list{margin-top:12px;padding-left:20px;line-height:1.8}
-        .dataset-block{border:1px solid #dbe3f0;border-radius:12px;padding:16px;background:#f8fbff}
-        .dataset-title{font-size:16px;font-weight:700;color:#111;margin-bottom:10px}
-        .compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:16px}
-        .compare-card{border:1px solid #dbe3f0;border-radius:12px;padding:16px;background:#fbfdff}
-        .compare-card h3{font-size:16px;margin-bottom:10px}
-        .compare-list{padding-left:20px;line-height:1.8;color:#374151}
-        .compare-diff{margin-top:12px;padding:12px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa}
-        .compare-diff strong{display:block;margin-bottom:8px;color:#9a3412}
         .muted{color:#666}
         .empty{padding:18px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#f8fafc}
         footer{text-align:center;padding:30px;color:#777;font-size:14px;margin-top:60px}
@@ -86,8 +78,8 @@
             <h2>导入与筛选</h2>
             <div class="grid">
                 <div class="field">
-                    <label for="xmlFile">活动配置表（可多选）</label>
-                    <input id="xmlFile" type="file" accept=".xml" multiple>
+                    <label for="xmlFile">活动配置表</label>
+                    <input id="xmlFile" type="file" accept=".xml">
                 </div>
                 <div class="field">
                     <label for="projectSelect">项目</label>
@@ -115,7 +107,6 @@
             </div>
             <div class="btn-row">
                 <button id="queryBtn" type="button">开始查询</button>
-                <button id="compareBtn" type="button" class="secondary">对比</button>
             </div>
         </div>
 
@@ -126,10 +117,6 @@
                 <div class="meta-item">
                     <strong>当前北京时间</strong>
                     <div id="nowText">-</div>
-                </div>
-                <div class="meta-item">
-                    <strong>已载入配置表数量</strong>
-                    <div id="datasetCount">0</div>
                 </div>
                 <div class="meta-item">
                     <strong>已载入活动数量</strong>
@@ -153,11 +140,6 @@
             <div class="btn-row">
                 <button id="moreBtn" type="button" class="secondary" style="display:none">更多</button>
             </div>
-        </div>
-
-        <div class="card">
-            <h2>对比结果</h2>
-            <div id="compareResultBox" class="empty">选择至少两个活动配置表后，点击“对比”可查看相同点和不同点。</div>
         </div>
         </div>
         </div>
@@ -209,7 +191,7 @@
         };
 
         const appState = {
-            datasets: [],
+            activities: [],
             currentResultCount: 5,
             suggestionValues: [],
             activeSuggestionIndex: -1
@@ -222,16 +204,13 @@
         const serverSelect = document.getElementById('serverSelect');
         const characterCreateDateInput = document.getElementById('characterCreateDate');
         const queryBtn = document.getElementById('queryBtn');
-        const compareBtn = document.getElementById('compareBtn');
         const moreBtn = document.getElementById('moreBtn');
         const statusBox = document.getElementById('statusBox');
         const nowText = document.getElementById('nowText');
-        const datasetCount = document.getElementById('datasetCount');
         const activityCount = document.getElementById('activityCount');
         const matchCount = document.getElementById('matchCount');
         const matchList = document.getElementById('matchList');
         const resultList = document.getElementById('resultList');
-        const compareResultBox = document.getElementById('compareResultBox');
         const suggestions = document.getElementById('activitySuggestions');
 
         xmlFileInput.addEventListener('change', handleFileChange);
@@ -241,7 +220,6 @@
         keywordInput.addEventListener('keydown', handleSuggestionKeydown);
         activityIndexSelect.addEventListener('change', runQuery);
         queryBtn.addEventListener('click', runQuery);
-        compareBtn.addEventListener('click', compareCurrentSelection);
         moreBtn.addEventListener('click', handleLoadMore);
         document.addEventListener('click', handleDocumentClick);
 
@@ -268,51 +246,37 @@
         }
 
         async function handleFileChange(event){
-            const files = Array.from(event.target.files || []);
-            if(!files.length){
+            const file = event.target.files && event.target.files[0];
+            if(!file){
                 return;
             }
 
-            setStatus(`正在读取 ${files.length} 个配置表...`, '');
+            setStatus('正在读取配置表...', '');
             try{
-                const datasets = await Promise.all(files.map(async file => {
-                    const text = await file.text();
-                    return {
-                        name: file.name,
-                        activities: parseActivityXml(text)
-                    };
-                }));
-
-                appState.datasets = datasets;
-                datasetCount.textContent = String(datasets.length);
-                activityCount.textContent = String(getAllActivities().length);
-                refreshSuggestions(getAllActivities());
+                const text = await file.text();
+                const activities = parseActivityXml(text);
+                appState.activities = activities;
+                activityCount.textContent = String(activities.length);
+                refreshSuggestions(activities);
                 resetActivityIndexOptions();
                 toggleMoreButton(false);
-                renderCompareEmpty('已载入多个活动配置表，点击“对比”查看相同点和不同点。');
-                setStatus(`导入成功：${datasets.map(item => item.name).join('、')}\n共解析到 ${getAllActivities().length} 条活动规则。`, 'ok');
+                setStatus(`导入成功：${file.name}\n共解析到 ${activities.length} 条活动规则。`, 'ok');
                 runQuery();
             }catch(error){
                 console.error(error);
-                appState.datasets = [];
-                datasetCount.textContent = '0';
+                appState.activities = [];
                 activityCount.textContent = '0';
                 matchCount.textContent = '0';
                 matchList.innerHTML = '';
                 resetActivityIndexOptions();
                 toggleMoreButton(false);
                 renderEmpty('配置表解析失败，请确认导入的是 H_活动.xml。');
-                renderCompareEmpty('配置表解析失败，暂时无法进行对比。');
                 setStatus(`解析失败：${error.message}`, 'error');
             }
         }
 
         function resetActivityIndexOptions(text){
             activityIndexSelect.innerHTML = `<option value="">${escapeHtml(text || '请先输入活动名称并查询')}</option>`;
-        }
-
-        function getAllActivities(){
-            return appState.datasets.flatMap(dataset => dataset.activities);
         }
 
         function handleFilterInput(){
@@ -517,35 +481,31 @@
             hideSuggestions();
         }
 
-        function getMatchedEntries(){
+        function getMatchedActivities(){
             const keyword = keywordInput.value.trim().toLowerCase();
-            return appState.datasets.flatMap(dataset => {
-                return dataset.activities
-                    .filter(item => {
-                        if(item.activitySwitch && item.activitySwitch !== '开启'){
-                            return false;
-                        }
+            return appState.activities.filter(item => {
+                if(item.activitySwitch && item.activitySwitch !== '开启'){
+                    return false;
+                }
 
-                        const matchKeyword = !keyword || [item.activityName, item.activityType, item.indexName, item.codeName]
-                            .join(' ')
-                            .toLowerCase()
-                            .includes(keyword);
+                const matchKeyword = !keyword || [item.activityName, item.activityType, item.indexName, item.codeName]
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(keyword);
 
-                        return matchKeyword;
-                    })
-                    .map(item => ({datasetName: dataset.name, item}));
+                return matchKeyword;
             });
         }
 
         function syncActivityIndexOptions(){
-            if(!appState.datasets.length){
+            if(!appState.activities.length){
                 resetActivityIndexOptions();
                 return [];
             }
             const selectedIndexValue = activityIndexSelect.value;
-            const matchedEntries = getMatchedEntries();
-            updateActivityIndexOptions(matchedEntries, selectedIndexValue);
-            return matchedEntries;
+            const matchedActivities = getMatchedActivities();
+            updateActivityIndexOptions(matchedActivities, selectedIndexValue);
+            return matchedActivities;
         }
 
         function runQuery(resetCount = true){
@@ -558,7 +518,7 @@
             const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
             const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
 
-            if(!appState.datasets.length){
+            if(!appState.activities.length){
                 matchCount.textContent = '0';
                 matchList.innerHTML = '';
                 resetActivityIndexOptions();
@@ -567,30 +527,30 @@
                 return;
             }
 
-            const matchedEntries = syncActivityIndexOptions();
+            const matchedActivities = syncActivityIndexOptions();
 
-            const filteredEntries = activityIndexSelect.value
-                ? matchedEntries.filter(entry => buildActivityOptionValue(entry.item) === activityIndexSelect.value)
-                : matchedEntries;
+            const filteredActivities = activityIndexSelect.value
+                ? matchedActivities.filter(item => buildActivityOptionValue(item) === activityIndexSelect.value)
+                : matchedActivities;
 
-            matchCount.textContent = String(filteredEntries.length);
-            renderMatchedRules(filteredEntries);
+            matchCount.textContent = String(filteredActivities.length);
+            renderMatchedRules(filteredActivities);
 
-            if(!matchedEntries.length){
+            if(!matchedActivities.length){
                 renderEmpty('没有匹配到活动，请换一个关键字试试。');
                 setStatus('当前配置表已导入，但没有命中活动关键字。', '');
                 toggleMoreButton(false);
                 return;
             }
 
-            if(!filteredEntries.length){
+            if(!filteredActivities.length){
                 renderEmpty('当前活动索引没有匹配到规则，请重新选择。');
                 setStatus('已匹配到活动名称，但当前活动索引未命中规则。', 'error');
                 toggleMoreButton(false);
                 return;
             }
 
-            const requiresCharacterDate = filteredEntries.some(entry => entry.item.timeType === '创角当天0点');
+            const requiresCharacterDate = filteredActivities.some(item => item.timeType === '创角当天0点');
             if(requiresCharacterDate && !Number.isFinite(characterCreateMs)){
                 renderEmpty('匹配到了创角当天0点活动，请先填写创角日期。');
                 setStatus('当前查询包含“创角当天0点”活动，请先补充创角日期。', 'error');
@@ -598,38 +558,37 @@
                 return;
             }
 
-            const occurrenceGroups = buildOccurrenceGroups(filteredEntries, serverOpenMs, characterCreateMs, nowMs, resultCount);
+            const occurrenceGroups = buildOccurrenceGroups(filteredActivities, serverOpenMs, characterCreateMs, nowMs, resultCount);
 
             if(!occurrenceGroups.some(group => group.occurrences.length)){ 
                 renderEmpty('匹配到了活动规则，但在未来范围内没有可展示的开启日期。');
-                setStatus(`已匹配 ${filteredEntries.length} 条规则，但没有找到未来开启日期。`, '');
+                setStatus(`已匹配 ${filteredActivities.length} 条规则，但没有找到未来开启日期。`, '');
                 toggleMoreButton(false);
                 return;
             }
 
             renderOccurrences(occurrenceGroups, nowMs);
             toggleMoreButton(occurrenceGroups.some(group => group.hasMore));
-            setStatus(`已匹配 ${filteredEntries.length} 条规则，已按北京时间输出 ${occurrenceGroups.length} 个配置表的结果。`, 'ok');
+            setStatus(`已匹配 ${filteredActivities.length} 条规则，已按北京时间输出最近开启日期。`, 'ok');
         }
 
         function toggleMoreButton(visible){
             moreBtn.style.display = visible ? 'inline-block' : 'none';
         }
 
-        function updateActivityIndexOptions(entries, preferredValue){
-            if(!entries.length){
+        function updateActivityIndexOptions(items, preferredValue){
+            if(!items.length){
                 resetActivityIndexOptions(keywordInput.value.trim() ? '未有该活动' : '请先输入活动名称并查询');
                 return;
             }
 
             const options = ['<option value="">全部匹配索引</option>'];
             const unique = new Map();
-            entries.forEach(entry => {
-                const value = buildActivityOptionValue(entry.item);
+            items.forEach(item => {
+                const value = buildActivityOptionValue(item);
                 if(unique.has(value)){
                     return;
                 }
-                const item = entry.item;
                 unique.set(value, `${item.indexName || '-'} | ${item.activityName || '-'} | ${item.codeName || '-'} | Id:${item.id || '-'}`);
             });
             unique.forEach((text, value) => {
@@ -637,7 +596,7 @@
             });
             activityIndexSelect.innerHTML = options.join('');
 
-            const canRestore = entries.some(entry => buildActivityOptionValue(entry.item) === preferredValue);
+            const canRestore = items.some(item => buildActivityOptionValue(item) === preferredValue);
             activityIndexSelect.value = canRestore ? preferredValue : '';
         }
 
@@ -645,21 +604,12 @@
             return [item.indexName, item.codeName, item.activityName].join('|');
         }
 
-        function buildOccurrenceGroups(entries, serverOpenMs, characterCreateMs, nowMs, resultCount){
-            const groups = new Map();
-            entries.forEach(entry => {
-                if(!groups.has(entry.datasetName)){
-                    groups.set(entry.datasetName, []);
-                }
-                const occurrenceSet = buildDisplayOccurrences(entry.item, serverOpenMs, characterCreateMs, nowMs, resultCount + 1);
-                groups.get(entry.datasetName).push(...occurrenceSet);
-            });
-
-            return Array.from(groups.entries()).map(([datasetName, occurrences]) => ({
-                datasetName,
+        function buildOccurrenceGroups(items, serverOpenMs, characterCreateMs, nowMs, resultCount){
+            const occurrences = items.flatMap(item => buildDisplayOccurrences(item, serverOpenMs, characterCreateMs, nowMs, resultCount + 1));
+            return [{
                 hasMore: occurrences.length > resultCount,
                 occurrences: occurrences.sort((a, b) => a.startMs - b.startMs).slice(0, resultCount)
-            }));
+            }];
         }
 
         function buildOccurrences(item, serverOpenMs, characterCreateMs, nowMs, limit){
@@ -987,20 +937,20 @@
             nowText.textContent = formatBjDateTime(Date.now());
         }
 
-        function renderMatchedRules(entries){
-            if(!entries.length){
+        function renderMatchedRules(items){
+            if(!items.length){
                 matchList.innerHTML = '';
                 return;
             }
-            matchList.innerHTML = entries.slice(0, 12).map(entry => {
-                return `<li>${escapeHtml(entry.datasetName)} | ${escapeHtml(entry.item.activityName)} <span class="muted">| ${escapeHtml(entry.item.timeType)} | ${escapeHtml(entry.item.codeName || entry.item.indexName || '-')}</span></li>`;
+            matchList.innerHTML = items.slice(0, 12).map(item => {
+                return `<li>${escapeHtml(item.activityName)} <span class="muted">| ${escapeHtml(item.timeType)} | ${escapeHtml(item.codeName || item.indexName || '-')}</span></li>`;
             }).join('');
         }
 
         function renderOccurrences(groups, nowMs){
-            resultList.innerHTML = groups.map(group => {
-                const body = group.occurrences.length
-                    ? group.occurrences.map(entry => {
+            const occurrences = groups[0] ? groups[0].occurrences : [];
+            resultList.innerHTML = occurrences.length
+                    ? occurrences.map(entry => {
                         const isActive = entry.startMs <= nowMs && nowMs <= entry.endMs;
                         const isPast = Boolean(entry.isPast);
                         const label = entry.item.activityName || entry.item.indexName || entry.item.codeName;
@@ -1015,126 +965,9 @@
                     </div>
                 `;
                     }).join('')
-                    : '<div class="empty">该配置表下没有可展示的未来开启日期。</div>';
-
-                return `<div class="dataset-block"><div class="dataset-title">${escapeHtml(group.datasetName)}</div>${body}</div>`;
-            }).join('');
+                    : '<div class="empty">没有可展示的开启日期。</div>';
         }
 
-        function compareCurrentSelection(){
-            const nowMs = Date.now();
-            const resultCount = appState.currentResultCount;
-            const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
-            const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
-            const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
-
-            if(appState.datasets.length < 2){
-                renderCompareEmpty('请至少导入两个活动配置表后再进行对比。');
-                return;
-            }
-
-            const matchedEntries = syncActivityIndexOptions();
-            if(!matchedEntries.length){
-                renderCompareEmpty('当前筛选条件没有命中活动，无法对比。');
-                return;
-            }
-
-            const uniqueKeys = Array.from(new Set(matchedEntries.map(entry => buildActivityOptionValue(entry.item))));
-            if(!activityIndexSelect.value && uniqueKeys.length > 1){
-                renderCompareEmpty('当前命中了多个活动索引，请先选择具体活动索引再对比。');
-                return;
-            }
-
-            const filteredEntries = activityIndexSelect.value
-                ? matchedEntries.filter(entry => buildActivityOptionValue(entry.item) === activityIndexSelect.value)
-                : matchedEntries;
-
-            if(filteredEntries.some(entry => entry.item.timeType === '创角当天0点') && !Number.isFinite(characterCreateMs)){
-                renderCompareEmpty('当前对比包含“创角当天0点”活动，请先填写创角日期。');
-                return;
-            }
-
-            const datasetNames = appState.datasets.map(dataset => dataset.name);
-            const datasetSummaries = datasetNames.map(datasetName => {
-                const entry = filteredEntries.find(item => item.datasetName === datasetName) || null;
-                const rule = entry ? entry.item : null;
-                const occurrences = rule ? buildOccurrences(rule, serverOpenMs, characterCreateMs, nowMs, resultCount) : [];
-                return {
-                    datasetName,
-                    rule,
-                    occurrences
-                };
-            });
-
-            const sameParts = [];
-            const diffParts = [];
-            const comparableFields = [
-                ['activityName', '活动名称'],
-                ['activityType', '活动类型'],
-                ['indexName', '活动索引'],
-                ['timeType', '时间类型'],
-                ['startTime', '开始时间'],
-                ['endTime', '结束时间'],
-                ['dayOfWeek', '周几开启'],
-                ['openNumberWeek', '开服第几周'],
-                ['resetPeriod', '重置周期'],
-                ['resetPeriodTimes', '重置次数'],
-                ['joinUnlockTips', '解锁条件']
-            ];
-
-            comparableFields.forEach(([field, label]) => {
-                const values = datasetSummaries.map(summary => summary.rule ? (summary.rule[field] || '空') : '缺失');
-                const uniqueValues = Array.from(new Set(values));
-                if(uniqueValues.length === 1){
-                    sameParts.push(`${label}：${uniqueValues[0]}`);
-                }else{
-                    diffParts.push({
-                        label,
-                        values: datasetSummaries.map((summary, index) => `${summary.datasetName}：${values[index]}`)
-                    });
-                }
-            });
-
-            const occurrenceValues = datasetSummaries.map(summary => {
-                if(!summary.occurrences.length){
-                    return '无未来开启日期';
-                }
-                return summary.occurrences.map(entry => `${formatBjShort(entry.startMs)} ~ ${formatBjDateTime(entry.endMs)}`).join('；');
-            });
-            const uniqueOccurrenceValues = Array.from(new Set(occurrenceValues));
-            if(uniqueOccurrenceValues.length === 1){
-                sameParts.push(`开启结果：${uniqueOccurrenceValues[0]}`);
-            }else{
-                diffParts.push({
-                    label: '开启结果',
-                    values: datasetSummaries.map((summary, index) => `${summary.datasetName}：${occurrenceValues[index]}`)
-                });
-            }
-
-            compareResultBox.className = '';
-            compareResultBox.innerHTML = `
-                <div class="compare-grid">
-                    <div class="compare-card">
-                        <h3>相同部分</h3>
-                        ${sameParts.length ? `<ul class="compare-list">${sameParts.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<div class="empty">没有完全相同的字段。</div>'}
-                    </div>
-                    <div class="compare-card">
-                        <h3>不同部分</h3>
-                        ${diffParts.length ? diffParts.map(item => `
-                            <div class="compare-diff">
-                                <strong>${escapeHtml(item.label)}</strong>
-                                <ul class="compare-list">${item.values.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>
-                            </div>
-                        `).join('') : '<div class="empty">没有差异，所有关键字段都一致。</div>'}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderCompareEmpty(text){
-            compareResultBox.className = 'empty';
-            compareResultBox.textContent = text;
-        }
 
         function getUnlockConditionText(item){
             if(item.joinUnlockTips){
