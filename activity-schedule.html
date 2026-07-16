@@ -20,6 +20,7 @@
         .card h2{margin-bottom:16px;font-size:20px}
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
         .field{position:relative}
+        .field.hidden{display:none}
         .field label{display:block;font-weight:600;margin-bottom:8px}
         .field input,.field select{width:100%;padding:11px 12px;border:1px solid #d5dbe7;border-radius:8px;font-size:15px;outline:none;background:#fff}
         .field input:focus,.field select:focus{border-color:#2563eb}
@@ -61,7 +62,7 @@
 <body>
     <header>
         <h1>活动开启时间查询工具</h1>
-        <p>导入本地 H_活动.xml 后，按北京时间查询未来 5 个或 10 个开启日期</p>
+        <p>导入本地 H_活动.xml 后，按北京时间查询活动开启日期</p>
     </header>
     <nav>
         <a href="index.html">首页</a>
@@ -88,6 +89,10 @@
                 <div class="field">
                     <label for="serverSelect">服务器</label>
                     <select id="serverSelect"></select>
+                </div>
+                <div class="field hidden" id="customServerTimeField">
+                    <label for="customServerTimeInput">自定义开服时间（北京时间）</label>
+                    <input id="customServerTimeInput" type="datetime-local" step="60">
                 </div>
                 <div class="field">
                     <label for="keyword">活动名称/类型</label>
@@ -202,6 +207,8 @@
         const keywordInput = document.getElementById('keyword');
         const activityIndexSelect = document.getElementById('activityIndexSelect');
         const serverSelect = document.getElementById('serverSelect');
+        const customServerTimeField = document.getElementById('customServerTimeField');
+        const customServerTimeInput = document.getElementById('customServerTimeInput');
         const characterCreateDateInput = document.getElementById('characterCreateDate');
         const queryBtn = document.getElementById('queryBtn');
         const moreBtn = document.getElementById('moreBtn');
@@ -215,6 +222,7 @@
 
         xmlFileInput.addEventListener('change', handleFileChange);
         projectSelect.addEventListener('change', refreshServerOptions);
+        serverSelect.addEventListener('change', handleServerChange);
         keywordInput.addEventListener('input', handleFilterInput);
         keywordInput.addEventListener('focus', renderSuggestionList);
         keywordInput.addEventListener('keydown', handleSuggestionKeydown);
@@ -239,10 +247,16 @@
             const project = PROJECTS[projectSelect.value] || PROJECTS.fl;
             serverSelect.innerHTML = Object.entries(project.servers).map(([key, server]) => {
                 return `<option value="${escapeHtml(key)}">${escapeHtml(server.name)} | ${escapeHtml(formatBjDateTime(server.openMs).slice(0, 16))}</option>`;
-            }).join('');
+            }).join('') + '<option value="custom">自定义开服时间</option>';
             if(project.servers.s4){
                 serverSelect.value = 's4';
             }
+            handleServerChange();
+        }
+
+        function handleServerChange(){
+            const isCustom = serverSelect.value === 'custom';
+            customServerTimeField.classList.toggle('hidden', !isCustom);
         }
 
         async function handleFileChange(event){
@@ -514,8 +528,7 @@
                 appState.currentResultCount = 5;
             }
             const resultCount = appState.currentResultCount;
-            const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
-            const serverOpenMs = currentProject.servers[serverSelect.value]?.openMs;
+            const serverOpenMs = getSelectedServerOpenMs();
             const characterCreateMs = parseBjDateTime(characterCreateDateInput.value);
 
             if(!appState.activities.length){
@@ -532,6 +545,14 @@
             const filteredActivities = activityIndexSelect.value
                 ? matchedActivities.filter(item => buildActivityOptionValue(item) === activityIndexSelect.value)
                 : matchedActivities;
+
+            const requiresServerOpenTime = filteredActivities.some(item => ['相对开服时间', '开服周几开启', '开服第几周周几'].includes(item.timeType));
+            if(requiresServerOpenTime && !Number.isFinite(serverOpenMs)){
+                renderEmpty('当前活动依赖开服时间，请先选择服务器或填写自定义开服时间。');
+                setStatus('当前查询包含依赖开服时间的活动，请先补充有效的开服时间。', 'error');
+                toggleMoreButton(false);
+                return;
+            }
 
             matchCount.textContent = String(filteredActivities.length);
             renderMatchedRules(filteredActivities);
@@ -574,6 +595,14 @@
 
         function toggleMoreButton(visible){
             moreBtn.style.display = visible ? 'inline-block' : 'none';
+        }
+
+        function getSelectedServerOpenMs(){
+            if(serverSelect.value === 'custom'){
+                return parseBjDateTimeInput(customServerTimeInput.value);
+            }
+            const currentProject = PROJECTS[projectSelect.value] || PROJECTS.fl;
+            return currentProject.servers[serverSelect.value]?.openMs;
         }
 
         function updateActivityIndexOptions(items, preferredValue){
@@ -673,7 +702,7 @@
             }
 
             if(type === '开服周几开启'){
-                const offsetDays = Math.max(0, toInt(item.startTime, 0));
+                const offsetDays = Math.max(0, toInt(item.startTime, 1) - 1);
                 const weekday = toJsWeekday(item.dayOfWeek);
                 const durationDays = Math.max(1, toInt(item.endTime, 1));
                 const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
@@ -682,8 +711,7 @@
                     return null;
                 }
                 const firstAnchor = startOfBjDay(serverOpenMs) + offsetDays * DAY_MS;
-                const firstStart = nextOrSameWeekday(firstAnchor, weekday);
-                return buildPastRecurringOccurrence(item, firstStart, durationDays, periodDays, maxTimes, nowMs);
+                return buildPastAnchoredWeeklyOccurrence(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, nowMs);
             }
 
             if(type === '开服第几周周几'){
@@ -695,8 +723,8 @@
                 if(weekday === null){
                     return null;
                 }
-                const firstStart = getOpenNumberWeekStart(serverOpenMs, openWeek, weekday);
-                return buildPastRecurringOccurrence(item, firstStart, durationDays, periodDays, maxTimes, nowMs);
+                const firstAnchor = startOfBjWeek(serverOpenMs) + (openWeek - 1) * 7 * DAY_MS;
+                return buildPastAnchoredWeeklyOccurrence(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, nowMs);
             }
 
             return null;
@@ -740,6 +768,35 @@
                 }
                 startMs += safePeriodDays * DAY_MS;
                 endMs += safePeriodDays * DAY_MS;
+                if(startMs > nowMs + 730 * DAY_MS){
+                    break;
+                }
+            }
+
+            return latest;
+        }
+
+        function buildPastAnchoredWeeklyOccurrence(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, nowMs){
+            if(!Number.isFinite(firstAnchor)){
+                return null;
+            }
+
+            let latest = null;
+            let startMs = nextOrSameWeekday(firstAnchor, weekday);
+            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const safePeriodDays = periodDays > 0 ? periodDays : 0;
+
+            for(let i = 0; i < loopLimit; i += 1){
+                const endMs = startMs + durationDays * DAY_MS - 1000;
+                if(endMs < nowMs){
+                    latest = {startMs, endMs, item, isPast: true, note: '已结束'};
+                } else {
+                    break;
+                }
+                if(!safePeriodDays){
+                    break;
+                }
+                startMs = getNextWeeklyCycleStart(startMs, weekday, safePeriodDays);
                 if(startMs > nowMs + 730 * DAY_MS){
                     break;
                 }
@@ -794,7 +851,7 @@
         }
 
         function buildLaunchWeekOccurrences(item, serverOpenMs, nowMs, limit){
-            const offsetDays = Math.max(0, toInt(item.startTime, 0));
+            const offsetDays = Math.max(0, toInt(item.startTime, 1) - 1);
             const weekday = toJsWeekday(item.dayOfWeek);
             const durationDays = Math.max(1, toInt(item.endTime, 1));
             const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
@@ -804,8 +861,7 @@
             }
 
             const firstAnchor = startOfBjDay(serverOpenMs) + offsetDays * DAY_MS;
-            const firstStart = nextOrSameWeekday(firstAnchor, weekday);
-            return buildRecurringList(item, firstStart, durationDays, periodDays, maxTimes, nowMs, limit);
+            return buildAnchoredWeeklyRecurringList(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, nowMs, limit);
         }
 
         function buildOpenNumberWeekOccurrences(item, serverOpenMs, nowMs, limit){
@@ -818,16 +874,62 @@
                 return [];
             }
 
-            const firstStart = getOpenNumberWeekStart(serverOpenMs, openWeek, weekday);
-            return buildRecurringList(item, firstStart, durationDays, periodDays, maxTimes, nowMs, limit);
+            const firstAnchor = startOfBjWeek(serverOpenMs) + (openWeek - 1) * 7 * DAY_MS;
+            return buildAnchoredWeeklyRecurringList(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, nowMs, limit);
         }
 
         // 规则说明：
-        // 开服第N周周几 = 以开服当天为第1周起点，每7天为一周。
-        // 例如开服第3周周日：先找到开服后第3个7天区间的起始日，再取该区间内的周日。
+        // 开服第N周周几 = 以“包含开服日的自然周”为第1周，按周一到周日计算。
+        // 例如开服日为周二，则当周周一到周日都属于开服第1周。
         function getOpenNumberWeekStart(serverOpenMs, openWeek, weekday){
-            const weekAnchor = startOfBjDay(serverOpenMs) + (openWeek - 1) * 7 * DAY_MS;
+            const weekAnchor = startOfBjWeek(serverOpenMs) + (openWeek - 1) * 7 * DAY_MS;
             return nextOrSameWeekday(weekAnchor, weekday);
+        }
+
+        function buildAnchoredWeeklyRecurringList(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, nowMs, limit){
+            if(!Number.isFinite(firstAnchor)){
+                return [];
+            }
+
+            const result = [];
+            let startMs = nextOrSameWeekday(firstAnchor, weekday);
+            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const safePeriodDays = periodDays > 0 ? periodDays : 0;
+
+            for(let i = 0; i < loopLimit; i += 1){
+                const endMs = startMs + durationDays * DAY_MS - 1000;
+                if(endMs >= nowMs){
+                    result.push({startMs, endMs, item});
+                }
+                if(result.length >= limit){
+                    break;
+                }
+                if(!safePeriodDays){
+                    break;
+                }
+                startMs = getNextWeeklyCycleStart(startMs, weekday, safePeriodDays);
+                if(startMs > nowMs + 730 * DAY_MS){
+                    break;
+                }
+            }
+
+            return result;
+        }
+
+        function getNextWeeklyCycleStart(currentStartMs, weekday, periodDays){
+            const referenceMs = currentStartMs + Math.max(periodDays - 1, 0) * DAY_MS;
+            let nextStartMs = nextOrSameWeekday(startOfBjWeek(referenceMs), weekday);
+            while(nextStartMs <= currentStartMs){
+                nextStartMs += 7 * DAY_MS;
+            }
+            return nextStartMs;
+        }
+
+        function startOfBjWeek(ms){
+            const dayStart = startOfBjDay(ms);
+            const weekday = bjWeekday(dayStart);
+            const mondayOffset = (weekday + 6) % 7;
+            return dayStart - mondayOffset * DAY_MS;
         }
 
         function buildRecurringList(item, firstStart, durationDays, periodDays, maxTimes, nowMs, limit){
@@ -895,6 +997,25 @@
                 Number(match[4] || 0),
                 Number(match[5] || 0),
                 Number(match[6] || 0)
+            );
+        }
+
+        function parseBjDateTimeInput(text){
+            const normalized = String(text || '').trim();
+            if(!normalized){
+                return NaN;
+            }
+            const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+            if(!match){
+                return NaN;
+            }
+            return createBjTimestamp(
+                Number(match[1]),
+                Number(match[2]),
+                Number(match[3]),
+                Number(match[4]),
+                Number(match[5]),
+                0
             );
         }
 
