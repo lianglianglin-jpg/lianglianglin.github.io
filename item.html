@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道具检索与获取渠道查询</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,Microsoft YaHei}
+        body{background:#f7f9fc;color:#222}
+        header{background:#2563eb;color:#fff;padding:30px 20px;text-align:center}
+        h1{margin-bottom:10px;font-size:24px}
+        header p{opacity:.92;line-height:1.6}
+        nav{background:#fff;padding:15px 20px;box-shadow:0 2px 6px #00000015}
+        nav a{text-decoration:none;color:#2563eb;margin:0 12px;font-size:16px}
+        nav a:hover{text-decoration:underline}
+        .container{max-width:1320px;margin:36px auto;padding:0 20px}
+        .layout{display:grid;gap:24px}
+        .workspace-grid{display:grid;grid-template-columns:minmax(360px,520px) minmax(0,1fr);gap:22px;align-items:start}
+        .left-panel{display:grid;gap:22px}
+        .right-panel{display:grid;gap:22px}
+        .card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 12px #00000010}
+        .card h2{font-size:20px;margin-bottom:16px}
+        .card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+        .card-head h2{margin-bottom:0}
+        .result-section{margin-bottom:24px}
+        .result-section:last-child{margin-bottom:0}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+        .import-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+        .import-grid .field.full{grid-column:1 / -1}
+        .field{position:relative}
+        .field label{display:block;font-weight:600;margin-bottom:8px}
+        .field input,.field select{width:100%;padding:11px 12px;border:1px solid #d5dbe7;border-radius:8px;font-size:15px;outline:none;background:#fff}
+        .field input:focus,.field select:focus{border-color:#2563eb}
+        .btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+        button{background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:15px}
+        button:hover{background:#1d4ed8}
+        button:disabled{cursor:not-allowed;opacity:.55}
+        button:disabled:hover{background:#2563eb}
+        button.secondary{background:#e8eefc;color:#1d4ed8}
+        button.secondary:hover{background:#dbe6ff}
+        .file-list{display:grid;gap:8px;margin-top:8px}
+        .file-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;font-size:13px;color:#374151}
+        .file-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .file-item button{padding:4px 8px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:12px;flex:0 0 auto}
+        .file-item button:hover{background:#fecaca}
+        .suggest-box{position:absolute;left:0;right:0;top:100%;margin-top:6px;max-height:260px;overflow:auto;background:#fff;border:1px solid #d5dbe7;border-radius:10px;box-shadow:0 10px 30px #00000012;z-index:20;display:none}
+        .suggest-item{padding:10px 12px;font-size:14px;color:#374151;cursor:pointer;display:flex;justify-content:space-between;gap:12px}
+        .suggest-item:hover,.suggest-item.active{background:#eff6ff;color:#1d4ed8}
+        .suggest-item span:last-child{color:#64748b;white-space:nowrap}
+        .result-list{display:grid;gap:12px}
+        .result-item{border:1px solid #dbe3f0;border-radius:10px;padding:15px 16px;background:#fbfdff}
+        .result-item .title{font-weight:700;color:#111;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .result-item .sub{color:#4b5563;font-size:14px;line-height:1.7;word-break:break-all}
+        .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:12px}
+        .tag.green{background:#dcfce7;color:#166534}
+        .tag.orange{background:#ffedd5;color:#9a3412}
+        .tag.gray{background:#e5e7eb;color:#374151}
+        .empty{padding:18px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#f8fafc}
+        .table-wrap{overflow:auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+        table{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
+        th,td{border-bottom:1px solid #e5e7eb;text-align:left;padding:10px 12px;vertical-align:top}
+        th{background:#f8fafc;color:#111;white-space:nowrap}
+        tr:last-child td{border-bottom:none}
+        .muted{color:#666}
+        footer{text-align:center;padding:30px;color:#777;font-size:14px;margin-top:60px}
+        @media (max-width:1080px){.workspace-grid{grid-template-columns:1fr}}
+        @media (max-width:720px){nav a{display:inline-block;margin:6px 10px}.container{padding:0 14px}.card{padding:18px}.import-grid{grid-template-columns:1fr}}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>道具检索与获取渠道查询</h1>
+        <p>导入道具表、道具获取途径表和活动配置表后，可按道具名称或道具 ID 查询，并导出命中的获取渠道。</p>
+    </header>
+    <nav>
+        <a href="index.html">首页</a>
+        <a href="activity-schedule.html">活动开启查询</a>
+        <a href="item.html">道具检索</a>
+        <a href="timestamp.html">时间戳工具</a>
+        <a href="weaknet.html">弱网延迟丢包测试</a>
+        <a href="clumsy-panel.html">Clumsy弱网参数面板</a>
+    </nav>
+
+    <div class="container">
+        <div class="layout">
+            <div class="workspace-grid">
+                <div class="left-panel">
+                    <div class="card">
+                        <h2>导入配置</h2>
+                        <div class="import-grid">
+                            <div class="field">
+                                <label for="itemFile">道具表</label>
+                                <input id="itemFile" type="file" accept=".xml,.csv,.txt,.tsv" multiple>
+                                <div id="itemFileList" class="file-list"></div>
+                            </div>
+                            <div class="field">
+                                <label for="itemGetFile">道具获取途径表</label>
+                                <input id="itemGetFile" type="file" accept=".xml,.csv,.txt,.tsv" multiple>
+                                <div id="itemGetFileList" class="file-list"></div>
+                            </div>
+                            <div class="field full">
+                                <label for="activityFile">活动配置表</label>
+                                <input id="activityFile" type="file" accept=".xml,.csv,.txt,.tsv" multiple>
+                                <div id="activityFileList" class="file-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>检索条件</h2>
+                        <div class="grid">
+                            <div class="field">
+                                <label for="keyword">道具名称 / 道具ID</label>
+                                <input id="keyword" placeholder="例如：1001 / 加速 / 领主体力" autocomplete="off" autocapitalize="off" spellcheck="false">
+                                <div id="itemSuggestions" class="suggest-box"></div>
+                            </div>
+                            <div class="field">
+                                <label for="matchMode">查询方式</label>
+                                <select id="matchMode">
+                                    <option value="exact">精确查询</option>
+                                    <option value="fuzzy">模糊查询</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="btn-row">
+                            <button id="queryBtn" type="button">开始查询</button>
+                            <button id="resetBtn" type="button" class="secondary">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="card">
+                        <div class="result-section">
+                            <h2>匹配道具</h2>
+                            <div id="itemResultList" class="result-list">
+                                <div class="empty">导入道具表或道具获取途径表后，输入道具名称或 ID，这里会显示匹配结果。</div>
+                            </div>
+                        </div>
+                        <div class="result-section">
+                            <div class="card-head">
+                                <h2>获取渠道与活动信息</h2>
+                                <button id="exportBtn" type="button" class="secondary" disabled>导出结果</button>
+                            </div>
+                            <div id="channelResultBox" class="empty">导入道具表或道具获取途径表后，选择或输入道具即可查看获取渠道；活动配置表可用于补充活动 ID 和时间。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        © 2026 我的个人网站
+    </footer>
+
+    <script>
+        const itemFileInput = document.getElementById('itemFile');
+        const itemGetFileInput = document.getElementById('itemGetFile');
+        const activityFileInput = document.getElementById('activityFile');
+        const itemFileList = document.getElementById('itemFileList');
+        const itemGetFileList = document.getElementById('itemGetFileList');
+        const activityFileList = document.getElementById('activityFileList');
+        const keywordInput = document.getElementById('keyword');
+        const matchModeSelect = document.getElementById('matchMode');
+        const queryBtn = document.getElementById('queryBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const itemResultList = document.getElementById('itemResultList');
+        const channelResultBox = document.getElementById('channelResultBox');
+        const suggestions = document.getElementById('itemSuggestions');
+
+        const state = {
+            items: [],
+            itemGetItems: [],
+            activityRows: [],
+            suggestionItems: [],
+            activeSuggestionIndex: -1,
+            lastMatchedItems: [],
+            lastChannelMatches: [],
+            selectedFiles: {
+                item: [],
+                itemGet: [],
+                activity: []
+            }
+        };
+
+        const itemIdHeaders = ['id','itemid','item_id','道具id','物品id','物品编号','道具编号','编号','道具ID','ItemId','ItemID','Id','ID'];
+        const itemNameHeaders = ['name','itemname','item_name','道具名称','道具名','物品名称','物品名','名称','Name','Name:C','ItemName'];
+        const displayNameHeaders = ['Name:C','道具名称','道具名','物品名称','物品名','名称','ItemName','Name'];
+        const indexNameHeaders = ['Name','name','Index','index','索引'];
+        const itemGetIndexHeaders = ['Index','index','索引'];
+        const jumpItemHeaders = ['Item','item','Item:C','道具','目标','索引'];
+        const accessChannelHeaders = ['accesschannels','accesschannel','access_channel','AccessChannels','AccessChannel','获取渠道','获取途径','获得渠道','来源','产出渠道','产出途径'];
+        const jumpHeaders = ['Jump','jump','跳转','获取渠道','获取途径','途径'];
+        const activityNameHeaders = ['activityname','活动名称','活动名','name','Name','ActivityName'];
+        const activityTypeHeaders = ['activitytype','活动类型','类型','ActivityType'];
+        const activityIdHeaders = ['id','活动id','活动ID','Id','ID'];
+        const activityIndexHeaders = ['index','index:c','索引','活动索引','Index','Code:C','code','codename'];
+        const startHeaders = ['starttime','开始时间','开启时间','StartTime'];
+        const endHeaders = ['endtime','结束时间','EndTime'];
+        const channelHintHeaders = ['reward','award','drop','item','goods','道具','物品','奖励','掉落','产出','礼包','获得','获取'];
+
+        itemFileInput.addEventListener('change', event => handleFileSelectionChange('item', event));
+        itemGetFileInput.addEventListener('change', event => handleFileSelectionChange('itemGet', event));
+        activityFileInput.addEventListener('change', event => handleFileSelectionChange('activity', event));
+        keywordInput.addEventListener('input', handleKeywordInput);
+        keywordInput.addEventListener('focus', renderSuggestions);
+        keywordInput.addEventListener('keydown', handleSuggestionKeydown);
+        matchModeSelect.addEventListener('change', handleModeChange);
+        queryBtn.addEventListener('click', runQuery);
+        resetBtn.addEventListener('click', resetQuery);
+        exportBtn.addEventListener('click', exportChannelResults);
+        document.addEventListener('click', handleDocumentClick);
+
+        async function handleFileSelectionChange(kind, event){
+            state.selectedFiles[kind] = Array.from(event.target.files || []);
+            renderSelectedFiles(kind);
+            await reparseFiles(kind);
+        }
+
+        async function removeSelectedFile(kind, index){
+            state.selectedFiles[kind].splice(index, 1);
+            syncFileInput(kind);
+            renderSelectedFiles(kind);
+            await reparseFiles(kind);
+        }
+
+        async function reparseFiles(kind){
+            if(kind === 'item'){
+                await handleItemFileChange();
+                return;
+            }
+            if(kind === 'itemGet'){
+                await handleItemGetFileChange();
+                return;
+            }
+            await handleActivityFileChange();
+        }
+
+        function renderSelectedFiles(kind){
+            const node = getFileListNode(kind);
+            const files = state.selectedFiles[kind] || [];
+            if(!node){
+                return;
+            }
+            node.innerHTML = files.map((file, index) => `
+                <div class="file-item">
+                    <span title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+                    <button type="button" data-kind="${escapeHtml(kind)}" data-index="${index}">删除</button>
+                </div>
+            `).join('');
+            Array.from(node.querySelectorAll('button')).forEach(button => {
+                button.addEventListener('click', () => {
+                    removeSelectedFile(button.getAttribute('data-kind'), Number(button.getAttribute('data-index')));
+                });
+            });
+        }
+
+        function syncFileInput(kind){
+            const input = getFileInput(kind);
+            if(!input){
+                return;
+            }
+            if(typeof DataTransfer === 'undefined'){
+                input.value = '';
+                return;
+            }
+            const transfer = new DataTransfer();
+            state.selectedFiles[kind].forEach(file => transfer.items.add(file));
+            input.files = transfer.files;
+        }
+
+        function getFileInput(kind){
+            if(kind === 'item'){
+                return itemFileInput;
+            }
+            if(kind === 'itemGet'){
+                return itemGetFileInput;
+            }
+            return activityFileInput;
+        }
+
+        function getFileListNode(kind){
+            if(kind === 'item'){
+                return itemFileList;
+            }
+            if(kind === 'itemGet'){
+                return itemGetFileList;
+            }
+            return activityFileList;
+        }
+
+        async function handleItemFileChange(){
+            const files = state.selectedFiles.item;
+            if(!files.length){
+                state.items = [];
+                refreshSuggestionItems();
+                runQuery();
+                return;
+            }
+            try{
+                const groups = await Promise.all(files.map(parseSearchFile));
+                state.items = dedupeItems(groups.flatMap(group => group.items));
+                refreshSuggestionItems();
+                renderSuggestions();
+                runQuery();
+            }catch(error){
+                console.error(error);
+                state.items = [];
+                refreshSuggestionItems();
+                renderItemEmpty('道具表解析失败，请确认文件格式或表头。');
+                clearChannelResults('道具表解析失败，暂时无法展示获取渠道。');
+            }
+        }
+
+        async function handleItemGetFileChange(){
+            const files = state.selectedFiles.itemGet;
+            if(!files.length){
+                state.itemGetItems = [];
+                refreshSuggestionItems();
+                runQuery();
+                return;
+            }
+            try{
+                const groups = await Promise.all(files.map(parseItemGetFile));
+                state.itemGetItems = dedupeItems(groups.flatMap(group => group.items));
+                refreshSuggestionItems();
+                renderSuggestions();
+                runQuery();
+            }catch(error){
+                console.error(error);
+                state.itemGetItems = [];
+                refreshSuggestionItems();
+                renderItemEmpty('道具获取途径表解析失败，请确认包含 ItemGet 和 ItemGet_Jump 表。');
+                clearChannelResults('道具获取途径表解析失败，暂时无法展示获取渠道。');
+            }
+        }
+
+        async function handleActivityFileChange(){
+            const files = state.selectedFiles.activity;
+            if(!files.length){
+                state.activityRows = [];
+                runQuery();
+                return;
+            }
+            try{
+                const groups = await Promise.all(files.map(parseActivityFile));
+                state.activityRows = groups.flat();
+                runQuery();
+            }catch(error){
+                console.error(error);
+                state.activityRows = [];
+                clearChannelResults('活动配置表解析失败，暂时无法展示获取渠道。');
+            }
+        }
+
+        async function parseSearchFile(file){
+            const tables = await parseTablesFromFile(file);
+            const items = [];
+            tables.forEach(table => {
+                const parsed = parseItemTable(table);
+                items.push(...parsed);
+            });
+            return {items};
+        }
+
+        async function parseItemGetFile(file){
+            const tables = await parseTablesFromFile(file);
+            const itemGetTable = tables.find(table => isSheetName(table.sheet, 'ItemGet') && !isSheetName(table.sheet, 'ItemGet_Jump'));
+            const jumpTable = tables.find(table => isSheetName(table.sheet, 'ItemGet_Jump'));
+            if(!itemGetTable || !jumpTable){
+                return {items: []};
+            }
+
+            const itemRows = parseGenericRows(itemGetTable, '道具获取途径');
+            const jumpRows = parseGenericRows(jumpTable, '道具获取途径');
+            const items = itemRows.map((row, index) => {
+                const name = getExactValue(row, ['Name']) || getFirstValue(row, indexNameHeaders);
+                const itemIndex = getExactValue(row, ['Index']) || getFirstValue(row, itemGetIndexHeaders);
+                if(!name || !itemIndex){
+                    return null;
+                }
+                const relatedRows = findRelatedJumpRows(itemIndex, jumpRows);
+                const jumps = relatedRows.flatMap(item => parseAccessChannels(getExactValue(item, ['Jump']) || getFirstValue(item, jumpHeaders)));
+                const jumpList = mergeUnique([], jumps);
+                return {
+                    id: itemIndex,
+                    name,
+                    indexName: name,
+                    itemGetIndex: itemIndex,
+                    accessChannels: jumpList.join('、'),
+                    accessChannelList: jumpList,
+                    source: row.source,
+                    sheet: row.sheet,
+                    headers: row.headers,
+                    raw: row.cells,
+                    sourceType: 'itemGet'
+                };
+            }).filter(Boolean);
+            return {items};
+        }
+
+        async function parseActivityFile(file){
+            const tables = await parseTablesFromFile(file);
+            const rows = [];
+            tables.forEach(table => {
+                rows.push(...parseGenericRows(table, '活动配置表'));
+            });
+            return rows;
+        }
+
+        async function parseTablesFromFile(file){
+            const text = await file.text();
+            if(file.name.toLowerCase().endsWith('.xml')){
+                return parseSpreadsheetXml(text, file.name);
+            }
+            return parseDelimitedText(text, file.name);
+        }
+
+        function parseSpreadsheetXml(text, fileName){
+            const xml = new DOMParser().parseFromString(text, 'application/xml');
+            if(xml.getElementsByTagName('parsererror')[0]){
+                throw new Error(`${fileName} XML 格式不正确。`);
+            }
+            const worksheets = getNodesByLocalName(xml, 'Worksheet');
+            if(!worksheets.length){
+                throw new Error(`${fileName} 未找到 Worksheet。`);
+            }
+            return worksheets.map((worksheet, index) => {
+                const table = getNodesByLocalName(worksheet, 'Table')[0];
+                const rows = table ? getNodesByLocalName(table, 'Row').map(rowToValues) : [];
+                return {
+                    source: fileName,
+                    sheet: getAttr(worksheet, 'Name') || `Sheet${index + 1}`,
+                    rows
+                };
+            }).filter(table => table.rows.length);
+        }
+
+        function parseDelimitedText(text, fileName){
+            const delimiter = detectDelimiter(text);
+            const rows = text.split(/\r?\n/)
+                .map(line => parseDelimitedLine(line, delimiter))
+                .filter(row => row.some(value => String(value || '').trim()));
+            return [{source: fileName, sheet: '默认', rows}];
+        }
+
+        function detectDelimiter(text){
+            const sample = text.split(/\r?\n/).slice(0, 5).join('\n');
+            const candidates = ['\t', ',', ';'];
+            return candidates.map(delimiter => ({delimiter, count: sample.split(delimiter).length}))
+                .sort((a, b) => b.count - a.count)[0].delimiter;
+        }
+
+        function parseDelimitedLine(line, delimiter){
+            if(delimiter !== ','){
+                return line.split(delimiter).map(value => value.trim());
+            }
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            for(let i = 0; i < line.length; i += 1){
+                const char = line[i];
+                if(char === '"' && line[i + 1] === '"'){
+                    current += '"';
+                    i += 1;
+                }else if(char === '"'){
+                    inQuotes = !inQuotes;
+                }else if(char === ',' && !inQuotes){
+                    values.push(current.trim());
+                    current = '';
+                }else{
+                    current += char;
+                }
+            }
+            values.push(current.trim());
+            return values;
+        }
+
+        function parseItemTable(table){
+            const headerInfo = findHeaderRow(table.rows, 'item');
+            if(!headerInfo){
+                return [];
+            }
+            const idIndex = findHeaderIndex(headerInfo.headers, itemIdHeaders);
+            const nameIndex = findPreferredHeaderIndex(headerInfo.headers, displayNameHeaders);
+            const indexNameIndex = findPreferredHeaderIndex(headerInfo.headers, indexNameHeaders);
+            const accessIndexes = findHeaderIndexes(headerInfo.headers, accessChannelHeaders);
+            if(idIndex < 0 || nameIndex < 0){
+                return [];
+            }
+            return table.rows.slice(headerInfo.index + 1).map(row => {
+                const id = normalizeCell(row[idIndex]);
+                const name = normalizeCell(row[nameIndex]);
+                const indexName = indexNameIndex >= 0 ? normalizeCell(row[indexNameIndex]) : name;
+                if(!isLikelyItemRow(id, name)){
+                    return null;
+                }
+                const accessChannelList = accessIndexes.flatMap(index => parseAccessChannels(row[index]));
+                const accessChannels = mergeUnique([], accessChannelList).join('、');
+                return {
+                    id,
+                    name,
+                    indexName,
+                    accessChannels,
+                    accessChannelList: parseAccessChannels(accessChannels),
+                    source: table.source,
+                    sheet: table.sheet,
+                    headers: headerInfo.headers,
+                    raw: row
+                };
+            }).filter(Boolean);
+        }
+
+        function parseGenericRows(table, sourceKind){
+            const headerInfo = findHeaderRow(table.rows, 'generic');
+            if(!headerInfo){
+                return [];
+            }
+            const headers = headerInfo.headers.map((header, index) => normalizeCell(header) || `列${index + 1}`);
+            return table.rows.slice(headerInfo.index + 1).map((row, rowOffset) => {
+                const values = {};
+                const cells = row.map(normalizeCell);
+                headers.forEach((header, index) => {
+                    values[header] = cells[index] || '';
+                });
+                if(!cells.some(Boolean)){
+                    return null;
+                }
+                return {
+                    sourceKind,
+                    source: table.source,
+                    sheet: table.sheet,
+                    rowNumber: headerInfo.index + rowOffset + 2,
+                    headers,
+                    cells,
+                    values
+                };
+            }).filter(Boolean);
+        }
+
+        function isSheetName(sheetName, expected){
+            return normalizeHeader(sheetName) === normalizeHeader(expected);
+        }
+
+        function findRelatedJumpRows(itemIndex, jumpRows){
+            const normalizedIndex = normalizeText(itemIndex);
+            if(!normalizedIndex){
+                return [];
+            }
+            return jumpRows.filter(row => normalizeText(getExactValue(row, ['Item']) || getFirstValue(row, jumpItemHeaders)) === normalizedIndex);
+        }
+
+        function getExactValue(row, aliases){
+            const normalizedAliases = aliases.map(normalizeHeader);
+            const index = row.headers.findIndex(header => normalizedAliases.includes(normalizeHeader(header)));
+            return index >= 0 ? row.cells[index] || '' : '';
+        }
+
+        function findHeaderRow(rows, mode){
+            const maxRows = Math.min(rows.length, 20);
+            let best = null;
+            for(let i = 0; i < maxRows; i += 1){
+                const headers = rows[i].map(normalizeCell);
+                const filledCount = headers.filter(Boolean).length;
+                if(filledCount < (mode === 'generic' ? 1 : 2)){
+                    continue;
+                }
+                const score = mode === 'item' ? scoreItemHeader(headers) : scoreGenericHeader(headers);
+                if(!best || score > best.score){
+                    best = {index: i, headers, score};
+                }
+            }
+            if(!best || best.score <= 0){
+                return null;
+            }
+            return best;
+        }
+
+        function scoreItemHeader(headers){
+            let score = 0;
+            if(findHeaderIndex(headers, itemIdHeaders) >= 0){
+                score += 4;
+            }
+            if(findHeaderIndex(headers, itemNameHeaders) >= 0){
+                score += 4;
+            }
+            return score;
+        }
+
+        function scoreGenericHeader(headers){
+            let score = headers.filter(Boolean).length >= 2 ? 1 : 0;
+            [activityNameHeaders, activityTypeHeaders, activityIdHeaders, activityIndexHeaders, startHeaders, endHeaders, jumpHeaders, indexNameHeaders].forEach(group => {
+                if(findHeaderIndex(headers, group) >= 0){
+                    score += 2;
+                }
+            });
+            if(headers.some(header => includesHeaderHint(header, channelHintHeaders))){
+                score += 2;
+            }
+            return score;
+        }
+
+        function isLikelyItemRow(id, name){
+            if(!id || !name){
+                return false;
+            }
+            const lowerId = id.toLowerCase();
+            const lowerName = name.toLowerCase();
+            const metaWords = ['int','string','float','bool','client','server','备注','说明','类型','字段'];
+            if(metaWords.includes(lowerId) || metaWords.includes(lowerName)){
+                return false;
+            }
+            return /\d/.test(id);
+        }
+
+        function findHeaderIndex(headers, candidates){
+            const normalizedCandidates = candidates.map(normalizeHeader);
+            for(let i = 0; i < headers.length; i += 1){
+                const header = normalizeHeader(headers[i]);
+                if(normalizedCandidates.includes(header)){
+                    return i;
+                }
+            }
+            return headers.findIndex(header => {
+                const normalized = normalizeHeader(header);
+                return normalizedCandidates.some(candidate => candidate && normalized.includes(candidate));
+            });
+        }
+
+        function findPreferredHeaderIndex(headers, candidates){
+            const normalizedHeaders = headers.map(normalizeHeader);
+            for(const candidate of candidates.map(normalizeHeader)){
+                const exactIndex = normalizedHeaders.findIndex(header => header === candidate);
+                if(exactIndex >= 0){
+                    return exactIndex;
+                }
+            }
+            for(const candidate of candidates.map(normalizeHeader)){
+                const fuzzyIndex = normalizedHeaders.findIndex(header => candidate && header.includes(candidate));
+                if(fuzzyIndex >= 0){
+                    return fuzzyIndex;
+                }
+            }
+            return -1;
+        }
+
+        function findHeaderIndexes(headers, candidates){
+            const normalizedCandidates = candidates.map(normalizeHeader);
+            return headers.map((header, index) => {
+                const normalized = normalizeHeader(header);
+                const matched = normalizedCandidates.some(candidate => candidate && (normalized === candidate || normalized.includes(candidate)));
+                return matched ? index : -1;
+            }).filter(index => index >= 0);
+        }
+
+        function includesHeaderHint(header, hints){
+            const normalized = normalizeHeader(header);
+            return hints.some(hint => normalized.includes(normalizeHeader(hint)));
+        }
+
+        function rowToValues(row){
+            const cells = getNodesByLocalName(row, 'Cell');
+            const values = [];
+            let cursor = 0;
+            cells.forEach(cell => {
+                const rawIndex = Number(getAttr(cell, 'Index'));
+                if(Number.isFinite(rawIndex) && rawIndex > 0){
+                    cursor = rawIndex - 1;
+                }
+                const data = getNodesByLocalName(cell, 'Data')[0];
+                values[cursor] = data ? data.textContent.trim() : '';
+                cursor += 1;
+            });
+            return values;
+        }
+
+        function getNodesByLocalName(node, localName){
+            return Array.from(node.getElementsByTagName('*')).filter(item => item.localName === localName || item.nodeName.endsWith(':' + localName));
+        }
+
+        function getAttr(node, localName){
+            if(!node || !node.attributes){
+                return '';
+            }
+            for(const attr of Array.from(node.attributes)){
+                if(attr.localName === localName || attr.name === localName || attr.name.endsWith(':' + localName)){
+                    return attr.value;
+                }
+            }
+            return '';
+        }
+
+        function dedupeItems(items){
+            const map = new Map();
+            items.forEach(item => {
+                const key = `${item.sourceType || 'item'}|${item.id}|${item.name}`;
+                if(!map.has(key)){
+                    map.set(key, {...item, sourceList: [item.source], sheetList: [item.sheet]});
+                    return;
+                }
+                const existing = map.get(key);
+                existing.accessChannelList = mergeUnique(existing.accessChannelList || [], item.accessChannelList || []);
+                existing.accessChannels = existing.accessChannelList.join('、');
+                existing.indexName = existing.indexName || item.indexName;
+                existing.sourceList = mergeUnique(existing.sourceList || [], [item.source]);
+                existing.sheetList = mergeUnique(existing.sheetList || [], [item.sheet]);
+                existing.source = existing.sourceList.join('、');
+                existing.sheet = existing.sheetList.join('、');
+            });
+            return Array.from(map.values());
+        }
+
+        function mergeUnique(first, second){
+            const values = [];
+            [...first, ...second].forEach(value => {
+                const text = normalizeCell(value);
+                if(text && !values.includes(text)){
+                    values.push(text);
+                }
+            });
+            return values;
+        }
+
+        function parseAccessChannels(value){
+            return normalizeCell(value)
+                .split(/[、,，;；|#\/\n\r]+/)
+                .map(item => item.trim())
+                .filter(Boolean);
+        }
+
+        function handleKeywordInput(){
+            renderSuggestions();
+            runQuery();
+        }
+
+        function handleModeChange(){
+            runQuery();
+        }
+
+        function refreshSuggestionItems(){
+            state.suggestionItems = [...state.items, ...state.itemGetItems]
+                .slice()
+                .sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'));
+        }
+
+        function resetQuery(){
+            keywordInput.value = '';
+            hideSuggestions();
+            renderItemEmpty('请输入道具名称或 ID 后开始查询。');
+            clearChannelResults('导入道具表或道具获取途径表后，选择或输入道具即可查看获取渠道。');
+        }
+
+        function runQuery(){
+            const keyword = normalizeCell(keywordInput.value);
+            if(!state.items.length && !state.itemGetItems.length){
+                state.lastMatchedItems = [];
+                renderItemEmpty('请先导入道具表或道具获取途径表。');
+                clearChannelResults('请先导入道具表或道具获取途径表。');
+                return;
+            }
+            if(!keyword){
+                state.lastMatchedItems = [];
+                renderItemEmpty('请输入道具名称或 ID，或点击输入框从下拉列表选择道具。');
+                clearChannelResults('选择或输入道具后，这里会显示获取渠道。');
+                return;
+            }
+            let matched = findMatchedItems();
+            state.lastMatchedItems = matched;
+            renderMatchedItems(matched);
+
+            const matches = buildChannelMatches(matched, keyword);
+            state.lastChannelMatches = matches;
+            updateExportState();
+            if(!matched.length && !matches.length){
+                renderChannelEmpty('没有匹配到道具或获取渠道，请换一个关键字或查询方式。');
+                return;
+            }
+            renderChannelMatches(matches, matched);
+        }
+
+        function findMatchedItems(){
+            const keyword = normalizeCell(keywordInput.value);
+            const mode = matchModeSelect.value;
+            if(!keyword){
+                return [];
+            }
+            const normalizedKeyword = normalizeText(keyword);
+            const matched = [...state.items, ...state.itemGetItems].filter(item => {
+                const id = normalizeText(item.id);
+                const name = normalizeText(item.name);
+                const indexName = normalizeText(item.indexName);
+                if(item.sourceType === 'itemGet'){
+                    return mode === 'exact'
+                        ? name === normalizedKeyword
+                        : name.includes(normalizedKeyword);
+                }
+                if(mode === 'exact'){
+                    return id === normalizedKeyword || name === normalizedKeyword || indexName === normalizedKeyword;
+                }
+                return id.includes(normalizedKeyword) || name.includes(normalizedKeyword) || indexName.includes(normalizedKeyword);
+            });
+            if(/^\d+$/.test(keyword)){
+                return matched.slice().sort((a, b) => toNumericId(a.id) - toNumericId(b.id));
+            }
+            return matched;
+        }
+
+        function toNumericId(id){
+            const parsed = Number.parseInt(String(id || '').replace(/\D/g, ''), 10);
+            return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+        }
+
+        function buildChannelMatches(items, keyword){
+            const result = [];
+
+            items.forEach(item => {
+                const channels = item.accessChannelList && item.accessChannelList.length
+                    ? item.accessChannelList
+                    : (item.accessChannels ? [item.accessChannels] : []);
+                if(!channels.length){
+                    return;
+                }
+                channels.forEach(channel => {
+                    const activities = findActivitiesByChannel(channel);
+                    if(!activities.length){
+                        result.push({type: '道具', item, keyword: '', channel, row: null});
+                        return;
+                    }
+                    activities.forEach(row => {
+                        result.push({type: '道具', item, keyword: '', channel, row});
+                    });
+                });
+            });
+
+            return dedupeChannelMatches(result);
+        }
+
+        function findActivitiesByChannel(channel){
+            const text = normalizeCell(channel);
+            if(!text || text === '未配置'){
+                return [];
+            }
+            return state.activityRows.filter(row => {
+                const target = normalizeText(text);
+                const activityTexts = [
+                    getFirstValue(row, activityNameHeaders),
+                    getFirstValue(row, activityTypeHeaders),
+                    getFirstValue(row, activityIndexHeaders),
+                    ...row.cells
+                ].filter(Boolean);
+                return activityTexts.some(value => {
+                    const source = normalizeText(value);
+                    return source.includes(target) || (source.length >= 2 && target.includes(source));
+                });
+            });
+        }
+
+        function dedupeChannelMatches(matches){
+            const map = new Map();
+            matches.forEach(match => {
+                const itemKey = match.item ? buildItemKey(match.item) : `keyword:${match.keyword}`;
+                const rowKey = match.row ? `${match.row.sourceKind}|${match.row.source}|${match.row.sheet}|${match.row.rowNumber}` : 'no-activity';
+                const key = `${match.type}|${itemKey}|${match.channel}|${rowKey}`;
+                if(!map.has(key)){
+                    map.set(key, match);
+                }
+            });
+            return Array.from(map.values());
+        }
+
+        function renderMatchedItems(items){
+            if(!items.length){
+                if(!state.items.length && !state.itemGetItems.length){
+                    renderItemEmpty('当前道具表未识别到道具 ID/名称列。');
+                    return;
+                }
+                renderItemEmpty('没有匹配到道具，请换一个关键字或查询方式。');
+                return;
+            }
+            itemResultList.innerHTML = items.map(item => `
+                <div class="result-item">
+                    <div class="title">
+                        <span>${escapeHtml(item.name)}</span>
+                        <span class="tag">${item.sourceType === 'itemGet' ? `Index ${escapeHtml(item.id)}` : `ID ${escapeHtml(item.id)}`}</span>
+                        ${item.indexName ? `<span class="tag gray">${escapeHtml(item.indexName)}</span>` : ''}
+                    </div>
+                    <div class="sub">来源：${escapeHtml(item.source)} / ${escapeHtml(item.sheet)}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderChannelMatches(matches, items){
+            if(!state.items.length && !state.itemGetItems.length){
+                renderChannelEmpty('尚未导入道具表或道具获取途径表。');
+                return;
+            }
+            if(!matches.length){
+                const labels = items.length ? items.slice(0, 8).map(item => `${item.id}/${item.name}`).join('、') : normalizeCell(keywordInput.value);
+                renderChannelEmpty(`未找到 ${labels}${items.length > 8 ? ' 等道具' : ''} 的获取渠道。`);
+                return;
+            }
+            const rows = matches.map(match => {
+                const activityId = match.row ? getFirstValue(match.row, activityIdHeaders) || '-' : '-';
+                const startTime = match.row ? getFirstValue(match.row, startHeaders) || '-' : '-';
+                const endTime = match.row ? getFirstValue(match.row, endHeaders) || '-' : '-';
+                const targetName = match.item ? match.item.name : `关键词：${match.keyword}`;
+                const targetId = getTargetId(match);
+                const activityTime = startTime === '-' && endTime === '-' ? '-' : `${startTime} ~ ${endTime}`;
+                return `
+                    <tr>
+                        <td>${escapeHtml(targetName)}</td>
+                        <td>${escapeHtml(targetId)}</td>
+                        <td>${escapeHtml(match.channel || '-')}</td>
+                        <td>${escapeHtml(activityId)}</td>
+                        <td>${escapeHtml(activityTime)}</td>
+                    </tr>
+                `;
+            }).join('');
+            channelResultBox.className = '';
+            channelResultBox.innerHTML = `
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>目标</th>
+                                <th>目标ID</th>
+                                <th>获取渠道</th>
+                                <th>活动ID</th>
+                                <th>活动时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function getFirstValue(row, aliases){
+            const index = findHeaderIndex(row.headers, aliases);
+            return index >= 0 ? row.cells[index] || '' : '';
+        }
+
+        function getTargetId(match){
+            if(!match.item){
+                return match.type || '-';
+            }
+            if(match.item.sourceType === 'itemGet'){
+                return match.item.itemGetIndex || match.item.id || '-';
+            }
+            return match.item.id || '-';
+        }
+
+        function renderSuggestions(){
+            if(document.activeElement !== keywordInput || !state.suggestionItems.length){
+                hideSuggestions();
+                return;
+            }
+            const entries = getCurrentSuggestionEntries();
+            if(!entries.length){
+                hideSuggestions();
+                return;
+            }
+            state.activeSuggestionIndex = 0;
+            suggestions.innerHTML = entries.map((entry, index) => `
+                <div class="suggest-item${index === state.activeSuggestionIndex ? ' active' : ''}" data-index="${index}">
+                    <span>${escapeHtml(entry.label)}</span><span>${escapeHtml(entry.meta)}</span>
+                </div>
+            `).join('');
+            suggestions.style.display = 'block';
+            Array.from(suggestions.querySelectorAll('.suggest-item')).forEach((node, index) => {
+                node.addEventListener('mousedown', event => {
+                    event.preventDefault();
+                    applySuggestion(entries[index]);
+                });
+            });
+        }
+
+        function applySuggestion(entry){
+            keywordInput.value = entry.label;
+            hideSuggestions();
+            runQuery();
+        }
+
+        function handleSuggestionKeydown(event){
+            const nodes = Array.from(suggestions.querySelectorAll('.suggest-item'));
+            if(!nodes.length){
+                return;
+            }
+            if(event.key === 'ArrowDown'){
+                event.preventDefault();
+                state.activeSuggestionIndex = Math.min(state.activeSuggestionIndex + 1, nodes.length - 1);
+                updateSuggestionActive(nodes);
+            }else if(event.key === 'ArrowUp'){
+                event.preventDefault();
+                state.activeSuggestionIndex = Math.max(state.activeSuggestionIndex - 1, 0);
+                updateSuggestionActive(nodes);
+            }else if(event.key === 'Enter'){
+                event.preventDefault();
+                const entryIndex = Number(nodes[state.activeSuggestionIndex]?.getAttribute('data-index'));
+                const entries = getCurrentSuggestionEntries();
+                if(Number.isFinite(entryIndex) && entries[entryIndex]){
+                    applySuggestion(entries[entryIndex]);
+                }
+            }else if(event.key === 'Escape'){
+                hideSuggestions();
+            }
+        }
+
+        function getCurrentSuggestionEntries(){
+            const keyword = normalizeCell(keywordInput.value);
+            const normalizedKeyword = normalizeText(keyword);
+            const matchedItems = state.suggestionItems.filter(item => {
+                if(!normalizedKeyword){
+                    return true;
+                }
+                if(item.sourceType === 'itemGet'){
+                    return normalizeText(item.name).includes(normalizedKeyword);
+                }
+                return normalizeText(item.id).includes(normalizedKeyword) || normalizeText(item.name).includes(normalizedKeyword) || normalizeText(item.indexName).includes(normalizedKeyword);
+            });
+            if(/^\d+$/.test(keyword)){
+                matchedItems.sort((a, b) => toNumericId(a.id) - toNumericId(b.id));
+            }
+            return matchedItems.slice(0, 12).map(item => ({
+                kind: 'item',
+                item,
+                label: item.name,
+                meta: item.sourceType === 'itemGet' ? `Index ${item.id}` : `ID ${item.id}`
+            }));
+        }
+
+        function updateSuggestionActive(nodes){
+            nodes.forEach((node, index) => node.classList.toggle('active', index === state.activeSuggestionIndex));
+            nodes[state.activeSuggestionIndex]?.scrollIntoView({block: 'nearest'});
+        }
+
+        function handleDocumentClick(event){
+            if(event.target === keywordInput || suggestions.contains(event.target)){
+                return;
+            }
+            hideSuggestions();
+        }
+
+        function hideSuggestions(){
+            suggestions.style.display = 'none';
+            suggestions.innerHTML = '';
+            state.activeSuggestionIndex = -1;
+        }
+
+        function buildItemKey(item){
+            return `${item.id}|${item.name}`;
+        }
+
+        function normalizeCell(value){
+            return String(value || '').replace(/^\uFEFF/, '').trim();
+        }
+
+        function normalizeHeader(value){
+            return normalizeCell(value).toLowerCase().replace(/[\s_:\-：]/g, '');
+        }
+
+        function normalizeText(value){
+            return normalizeCell(value).toLowerCase();
+        }
+
+        function renderItemEmpty(text){
+            itemResultList.innerHTML = `<div class="empty">${escapeHtml(text)}</div>`;
+        }
+
+        function renderChannelEmpty(text){
+            channelResultBox.className = 'empty';
+            channelResultBox.textContent = text;
+        }
+
+        function clearChannelResults(text){
+            state.lastChannelMatches = [];
+            updateExportState();
+            renderChannelEmpty(text);
+        }
+
+        function updateExportState(){
+            exportBtn.disabled = !state.lastChannelMatches.length;
+        }
+
+        function exportChannelResults(){
+            if(!state.lastChannelMatches.length){
+                return;
+            }
+            const headers = ['目标','目标ID','获取渠道','活动ID','活动时间'];
+            const rows = state.lastChannelMatches.map(match => {
+                const target = match.item ? match.item.name : `关键词：${match.keyword}`;
+                const targetId = getTargetId(match);
+                const activityId = match.row ? getFirstValue(match.row, activityIdHeaders) || '-' : '-';
+                const startTime = match.row ? getFirstValue(match.row, startHeaders) || '-' : '-';
+                const endTime = match.row ? getFirstValue(match.row, endHeaders) || '-' : '-';
+                const activityTime = startTime === '-' && endTime === '-' ? '-' : `${startTime} ~ ${endTime}`;
+                return [
+                    target,
+                    targetId,
+                    match.channel || '-',
+                    activityId,
+                    activityTime
+                ];
+            });
+            const csv = [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\r\n');
+            const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            link.href = url;
+            link.download = `道具获取渠道结果_${timestamp}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeCsv(value){
+            const text = String(value == null ? '' : value).replace(/\r?\n/g, ' ');
+            if(/[",\r\n]/.test(text)){
+                return `"${text.replace(/"/g, '""')}"`;
+            }
+            return text;
+        }
+
+        function escapeRegExp(text){
+            return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function escapeHtml(text){
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+</html>
