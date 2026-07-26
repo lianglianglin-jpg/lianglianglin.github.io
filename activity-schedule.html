@@ -635,7 +635,7 @@
         }
 
         function buildOccurrenceGroups(items, serverOpenMs, characterCreateMs, nowMs, resultCount){
-            const occurrences = items.flatMap(item => buildDisplayOccurrences(item, serverOpenMs, characterCreateMs, nowMs, resultCount + 1));
+            const occurrences = items.flatMap(item => buildDisplayOccurrences(item, serverOpenMs, characterCreateMs, resultCount + 1));
             return [{
                 hasMore: occurrences.length > resultCount,
                 occurrences: occurrences.sort((a, b) => a.startMs - b.startMs).slice(0, resultCount)
@@ -670,14 +670,77 @@
             return [];
         }
 
-        function buildDisplayOccurrences(item, serverOpenMs, characterCreateMs, nowMs, limit){
-            const futureOccurrences = buildOccurrences(item, serverOpenMs, characterCreateMs, nowMs, limit);
-            if(futureOccurrences.length){
-                return futureOccurrences;
+        function buildDisplayOccurrences(item, serverOpenMs, characterCreateMs, limit){
+            const type = item.timeType;
+
+            if(type === '固定时间'){
+                return buildFixedDateTimeline(item);
+            }
+            if(type === '相对开服时间'){
+                return buildRangeTimeline(item, startOfBjDay(serverOpenMs), '相对开服时间');
+            }
+            if(type === '创角当天0点'){
+                if(!Number.isFinite(characterCreateMs)){
+                    return [];
+                }
+                return buildRangeTimeline(item, startOfBjDay(characterCreateMs), '基于创角日期计算');
+            }
+            if(type === '开服周几开启'){
+                const offsetDays = Math.max(0, toInt(item.startTime, 1) - 1);
+                const weekday = toJsWeekday(item.dayOfWeek);
+                const durationDays = Math.max(1, toInt(item.endTime, 1));
+                const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
+                const maxTimes = Math.max(0, toInt(item.resetPeriodTimes, 0));
+                if(weekday === null){
+                    return [];
+                }
+                const firstAnchor = startOfBjDay(serverOpenMs) + offsetDays * DAY_MS;
+                return buildAnchoredWeeklyTimeline(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, limit);
+            }
+            if(type === '开服第几周周几'){
+                const openWeek = Math.max(1, toInt(item.openNumberWeek, 1));
+                const weekday = toJsWeekday(item.dayOfWeek);
+                const durationDays = Math.max(1, toInt(item.endTime, 1));
+                const periodDays = Math.max(0, toInt(item.resetPeriod, 0));
+                const maxTimes = Math.max(0, toInt(item.resetPeriodTimes, 0));
+                if(weekday === null){
+                    return [];
+                }
+                const firstAnchor = startOfBjWeek(serverOpenMs) + (openWeek - 1) * 7 * DAY_MS;
+                return buildAnchoredWeeklyTimeline(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, limit);
+            }
+            if(type === '永久开放'){
+                return [{
+                    startMs: Number.NEGATIVE_INFINITY,
+                    endMs: Infinity,
+                    item,
+                    note: '永久开放'
+                }];
             }
 
-            const pastOccurrence = buildPastOccurrence(item, serverOpenMs, characterCreateMs, nowMs);
-            return pastOccurrence ? [pastOccurrence] : [];
+            return [];
+        }
+
+        function buildFixedDateTimeline(item){
+            const startMs = parseBjDateTime(item.startTime);
+            const endMs = parseBjDateTime(item.endTime) || startMs;
+            if(!Number.isFinite(startMs)){
+                return [];
+            }
+            return [{startMs, endMs, item}];
+        }
+
+        function buildRangeTimeline(item, baseDayStart, note){
+            const startDay = toInt(item.startTime, NaN);
+            const endDay = toInt(item.endTime, startDay);
+            if(!Number.isFinite(startDay) || !Number.isFinite(baseDayStart)){
+                return [];
+            }
+            const startOffsetDays = Math.max(0, startDay - 1);
+            const endOffsetDays = Math.max(startDay, endDay);
+            const startMs = baseDayStart + startOffsetDays * DAY_MS;
+            const endMs = baseDayStart + endOffsetDays * DAY_MS - 1000;
+            return [{startMs, endMs, item, note}];
         }
 
         function buildPastOccurrence(item, serverOpenMs, characterCreateMs, nowMs){
@@ -755,7 +818,7 @@
             let latest = null;
             let startMs = firstStart;
             let endMs = firstStart + durationDays * DAY_MS - 1000;
-            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const loopLimit = maxTimes > 0 ? maxTimes + 1 : 200;
             const safePeriodDays = periodDays > 0 ? periodDays : 0;
 
             for(let i = 0; i < loopLimit; i += 1){
@@ -784,7 +847,7 @@
 
             let latest = null;
             let startMs = nextOrSameWeekday(firstAnchor, weekday);
-            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const loopLimit = maxTimes > 0 ? maxTimes + 1 : 200;
             const safePeriodDays = periodDays > 0 ? periodDays : 0;
 
             for(let i = 0; i < loopLimit; i += 1){
@@ -894,7 +957,7 @@
 
             const result = [];
             let startMs = nextOrSameWeekday(firstAnchor, weekday);
-            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const loopLimit = maxTimes > 0 ? maxTimes + 1 : 200;
             const safePeriodDays = periodDays > 0 ? periodDays : 0;
 
             for(let i = 0; i < loopLimit; i += 1){
@@ -917,9 +980,34 @@
             return result;
         }
 
+        function buildAnchoredWeeklyTimeline(item, firstAnchor, weekday, durationDays, periodDays, maxTimes, limit){
+            if(!Number.isFinite(firstAnchor)){
+                return [];
+            }
+
+            const result = [];
+            let startMs = nextOrSameWeekday(firstAnchor, weekday);
+            const loopLimit = maxTimes > 0 ? maxTimes + 1 : 200;
+            const safePeriodDays = periodDays > 0 ? periodDays : 0;
+
+            for(let i = 0; i < loopLimit; i += 1){
+                const endMs = startMs + durationDays * DAY_MS - 1000;
+                result.push({startMs, endMs, item});
+                if(result.length >= limit){
+                    break;
+                }
+                if(!safePeriodDays){
+                    break;
+                }
+                startMs = getNextWeeklyCycleStart(startMs, weekday, safePeriodDays);
+            }
+
+            return result;
+        }
+
         function getNextWeeklyCycleStart(currentStartMs, weekday, periodDays){
-            const referenceMs = currentStartMs + Math.max(periodDays - 1, 0) * DAY_MS;
-            let nextStartMs = nextOrSameWeekday(startOfBjWeek(referenceMs), weekday);
+            const referenceMs = currentStartMs + Math.max(periodDays, 0) * DAY_MS;
+            let nextStartMs = nextOrSameWeekday(referenceMs, weekday);
             while(nextStartMs <= currentStartMs){
                 nextStartMs += 7 * DAY_MS;
             }
@@ -940,7 +1028,7 @@
             const result = [];
             let startMs = firstStart;
             let endMs = firstStart + durationDays * DAY_MS - 1000;
-            const loopLimit = maxTimes > 0 ? maxTimes : 200;
+            const loopLimit = maxTimes > 0 ? maxTimes + 1 : 200;
             const safePeriodDays = periodDays > 0 ? periodDays : 0;
 
             for(let i = 0; i < loopLimit; i += 1){
@@ -1074,15 +1162,17 @@
             resultList.innerHTML = occurrences.length
                     ? occurrences.map(entry => {
                         const isActive = entry.startMs <= nowMs && nowMs <= entry.endMs;
-                        const isPast = Boolean(entry.isPast);
+                        const isPast = entry.endMs < nowMs || Boolean(entry.isPast);
                         const label = entry.item.activityName || entry.item.indexName || entry.item.codeName;
                         const badge = isActive ? '<span class="tag">当前进行中</span>' : '';
                         const note = entry.note ? ` | ${escapeHtml(entry.note)}` : '';
+                        const startText = entry.note === '永久开放' ? '长期开放' : escapeHtml(formatBjShort(entry.startMs));
+                        const endText = Number.isFinite(entry.endMs) ? escapeHtml(formatBjDateTime(entry.endMs)) : '长期开放';
                         return `
                     <div class="result-item">
                         <div class="title">${escapeHtml(label)}${badge}</div>
-                        <div class="sub${isPast ? ' past' : ''}">开启时间：${escapeHtml(formatBjShort(entry.startMs))}${isPast ? '（已过去）' : ''}</div>
-                        <div class="sub${isPast ? ' past' : ''}">结束时间：${Number.isFinite(entry.endMs) ? escapeHtml(formatBjDateTime(entry.endMs)) : '长期开放'}</div>
+                        <div class="sub${isPast ? ' past' : ''}">开启时间：${startText}${isPast ? '（已过去）' : ''}</div>
+                        <div class="sub${isPast ? ' past' : ''}">结束时间：${endText}</div>
                         <div class="sub">解锁条件：${escapeHtml(getUnlockConditionText(entry.item))}</div>
                     </div>
                 `;
